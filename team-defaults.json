@@ -1,0 +1,12 @@
+{
+  "meetings": [],
+  "descriptionTemplates": {
+    "commit": "[auto] Commits on {issue}",
+    "review": "[auto] Reviewed PR #{prNum}: {prTitle}",
+    "meeting": "[auto] {title}"
+  },
+  "defaultMinutes": {
+    "commitPerIssuePerDay": 1,
+    "reviewPerPrPerDay": 15
+  }
+}
