@@ -80,18 +80,8 @@ jobs:
             and stop. Do NOT guess.
 
             STEP 3 — Implement
-            Classify the change yourself:
-              - "Small": docs, README, comments, user-visible strings, CSS
-                tweaks, a one-line text change. Commit directly to master
-                and push.
-              - "Bug / logic": anything else — any edit under src/ that
-                changes behavior, manifest, auth, API calls, aggregator,
-                orchestrator, clients, types. Create branch
-                `fix/issue-${{ github.event.issue.number }}`, push, and
-                open a PR with `gh pr create`. In the PR body reference
-                the issue as `Fixes #${{ github.event.issue.number }}`.
-
-            Regardless of path, before committing:
+            Always work on a new branch created by the action. Before
+            committing:
               - Run `npm run check` (svelte-check). It MUST pass with 0
                 errors and 0 warnings. Iterate until it does.
               - Commit message: neutral tone, short subject
@@ -99,10 +89,14 @@ jobs:
                 `Fixes #${{ github.event.issue.number }}`
                 and `Co-Authored-By: Claude <noreply@anthropic.com>`.
 
+            After pushing the branch, open a pull request against master
+            with `gh pr create` — title `fix: <summary>`, body referencing
+            `Fixes #${{ github.event.issue.number }}`. Do NOT merge the PR
+            yourself; Kristaps reviews and merges manually.
+
             STEP 4 — Sign off
-            Post ONE issue comment summarising what was done, with a link
-            to the commit (for direct pushes) or the PR (for bug fixes).
-            Keep it factual, one or two sentences.
+            Post ONE issue comment with a link to the PR. Keep it factual,
+            one or two sentences.
 
             Constraints:
               - Do NOT add new npm dependencies. If one is genuinely
