@@ -4,6 +4,8 @@ export interface MeetingMapping {
   match: string;
   jiraKey: string;
   description?: string;
+  /** If true, matching meetings are dropped from the preview entirely. */
+  skip?: boolean;
 }
 
 export interface GithubOrgsConfig {

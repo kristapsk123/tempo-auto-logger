@@ -53,6 +53,7 @@ export interface LoadedPreview {
   unmapped: CalendarEvent[];
   skippedAllDay: number;
   skippedByAttendance: number;
+  skippedByMapping: number;
   existingWorklogs: TempoWorklog[];
   alreadyLoggedIds: Set<string>;
   jiraUsername: string;
@@ -62,7 +63,12 @@ export interface LoadedPreview {
 
 export type ReaggregatedPreview = Pick<
   LoadedPreview,
-  'entries' | 'unmapped' | 'skippedAllDay' | 'skippedByAttendance' | 'alreadyLoggedIds'
+  | 'entries'
+  | 'unmapped'
+  | 'skippedAllDay'
+  | 'skippedByAttendance'
+  | 'skippedByMapping'
+  | 'alreadyLoggedIds'
 >;
 
 export async function loadPreview(
@@ -133,6 +139,7 @@ export async function loadPreview(
     unmapped: aggregated.unmappedMeetings,
     skippedAllDay: aggregated.skippedAllDay,
     skippedByAttendance: aggregated.skippedByAttendance,
+    skippedByMapping: aggregated.skippedByMapping,
     existingWorklogs: existing,
     alreadyLoggedIds,
     jiraUsername: me.name,
@@ -246,6 +253,7 @@ export async function reaggregate(
     unmapped: aggregated.unmappedMeetings,
     skippedAllDay: aggregated.skippedAllDay,
     skippedByAttendance: aggregated.skippedByAttendance,
+    skippedByMapping: aggregated.skippedByMapping,
     alreadyLoggedIds: computeAlreadyLogged(aggregated.entries, existingWorklogs),
   };
 }

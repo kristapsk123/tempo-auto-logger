@@ -6,14 +6,24 @@
     favorites = [] as JiraIssueOption[],
     placeholder = 'NUMO-1234',
     inputClass = '',
+    size = 'compact' as 'compact' | 'normal',
+    disabled = false,
     onchange,
   }: {
     value?: string;
     favorites?: JiraIssueOption[];
     placeholder?: string;
     inputClass?: string;
+    size?: 'compact' | 'normal';
+    disabled?: boolean;
     onchange?: (newValue: string) => void;
   } = $props();
+
+  const baseInputClass = $derived(
+    size === 'normal'
+      ? 'w-full px-2 py-1.5 border rounded text-sm font-mono uppercase'
+      : 'w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] font-mono uppercase',
+  );
 
   let showDropdown = $state(false);
 
@@ -46,6 +56,7 @@
   <input
     type="text"
     bind:value
+    {disabled}
     oninput={() => onchange?.(value)}
     onfocus={() => (showDropdown = true)}
     onblur={() => {
@@ -53,9 +64,9 @@
       setTimeout(() => (showDropdown = false), 150);
     }}
     {placeholder}
-    class="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] font-mono uppercase {inputClass}"
+    class="{baseInputClass} border-gray-300 disabled:bg-gray-100 disabled:text-gray-400 {inputClass}"
   />
-  {#if showDropdown && filtered.length > 0}
+  {#if showDropdown && !disabled && filtered.length > 0}
     <div
       class="absolute top-full left-0 z-20 bg-white border border-gray-300 shadow-lg rounded-b max-h-56 overflow-auto mt-0.5 min-w-full w-[22rem] max-w-[24rem]"
     >

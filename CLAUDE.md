@@ -128,7 +128,10 @@ These were agreed with the user; don't relitigate unless they ask:
   case-insensitive, longest-match wins. Team defaults in
   `team-defaults.json` + per-user overrides in `chrome.storage.local`.
   Prompt-and-learn UI in popup's unmapped section (inline) + full CRUD
-  in Settings → Meetings tab.
+  in Settings → Meetings tab. A mapping with `skip: true` drops
+  matching meetings from the preview entirely (use it for "Out of
+  office", holidays, lunch breaks, etc. — the aggregator counts them
+  as `skippedByMapping` but doesn't create an entry).
 - **Jira key extraction from GitHub activity:** PR title → branch →
   commit message (first match wins).
 - **Date range cap:** 30 days (not currently exposed in UI).

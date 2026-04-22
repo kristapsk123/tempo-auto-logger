@@ -45,6 +45,7 @@
     match: string;
     jiraKey: string;
     description: string;
+    skip: boolean;
     invalidJira: boolean;
     invalidMatch: boolean;
   };
@@ -82,6 +83,7 @@
         match: m.match,
         jiraKey: m.jiraKey,
         description: m.description ?? '',
+        skip: m.skip === true,
         invalidJira: false,
         invalidMatch: false,
       }));
@@ -127,6 +129,7 @@
         match: '',
         jiraKey: '',
         description: '',
+        skip: false,
         invalidJira: false,
         invalidMatch: false,
       },
@@ -148,7 +151,10 @@
     const seen = new Set<string>();
     for (const r of userMappings) {
       r.invalidMatch = r.match.trim().length === 0;
-      r.invalidJira = !/^[A-Z][A-Z0-9]+-\d+$/i.test(r.jiraKey.trim());
+      // Jira key is only required when the mapping actually logs.
+      r.invalidJira = r.skip
+        ? false
+        : !/^[A-Z][A-Z0-9]+-\d+$/i.test(r.jiraKey.trim());
       if (r.invalidMatch || r.invalidJira) ok = false;
       const key = r.match.trim().toLowerCase();
       if (seen.has(key)) {
@@ -165,8 +171,9 @@
     if (!validateMappings()) return;
     const normalized: MeetingMapping[] = userMappings.map((r) => ({
       match: r.match.trim(),
-      jiraKey: r.jiraKey.trim().toUpperCase(),
+      jiraKey: r.skip ? '' : r.jiraKey.trim().toUpperCase(),
       description: r.description.trim() || undefined,
+      skip: r.skip === true ? true : undefined,
     }));
     await replaceUserMeetingMappings(normalized);
     mappingsDirty = false;
@@ -336,7 +343,9 @@
             A meeting's title is matched against these "match" strings
             (case-insensitive substring). Longest match wins. Description
             is optional — if blank, the meeting's actual calendar title is
-            used.
+            used. Tick <strong>Skip</strong> to drop matching meetings
+            from the preview entirely (useful for "Out of office",
+            holidays, etc.).
           </p>
 
           <div class="space-y-2 mb-3">
@@ -346,12 +355,19 @@
                 when unmapped meetings appear.
               </div>
             {/if}
+            <div class="flex gap-2 items-center text-[11px] text-gray-500 uppercase px-1">
+              <div class="flex-1">Match substring</div>
+              <div class="w-44">Jira key</div>
+              <div class="w-16 text-center">Skip</div>
+              <div class="flex-1">Description (optional)</div>
+              <div class="w-8"></div>
+            </div>
             {#each userMappings as row, i (i)}
-              <div class="flex gap-2 items-start">
+              <div class="flex gap-2 items-center">
                 <div class="flex-1">
                   <input
                     type="text"
-                    placeholder="match substring"
+                    placeholder="e.g. sigma daily"
                     bind:value={row.match}
                     oninput={onMappingChange}
                     class="w-full px-2 py-1.5 border rounded text-sm {row.invalidMatch
@@ -359,25 +375,37 @@
                       : 'border-gray-300'}"
                   />
                 </div>
-                <div class="w-40">
+                <div class="w-44">
                   <JiraPicker
                     bind:value={row.jiraKey}
                     {favorites}
+                    size="normal"
+                    disabled={row.skip}
                     inputClass={row.invalidJira ? 'border-red-400 bg-red-50' : ''}
                     onchange={onMappingChange}
+                  />
+                </div>
+                <div class="w-16 flex justify-center">
+                  <input
+                    type="checkbox"
+                    class="accent-blue-600 w-4 h-4 cursor-pointer"
+                    bind:checked={row.skip}
+                    onchange={onMappingChange}
+                    title="Drop matching meetings — don't log anything"
                   />
                 </div>
                 <div class="flex-1">
                   <input
                     type="text"
-                    placeholder="description (optional)"
+                    placeholder={row.skip ? 'not used when Skip is on' : 'description (optional)'}
                     bind:value={row.description}
                     oninput={onMappingChange}
-                    class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                    disabled={row.skip}
+                    class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
                 <button
-                  class="px-2 py-1.5 text-red-600 hover:bg-red-50 rounded text-sm"
+                  class="w-8 text-red-600 hover:bg-red-50 rounded text-sm"
                   onclick={() => removeMappingRow(i)}
                   aria-label="Remove"
                 >

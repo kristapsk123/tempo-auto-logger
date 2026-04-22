@@ -28,6 +28,7 @@
     event: CalendarEvent;
     jiraInput: string;
     matchInput: string;
+    skipInput: boolean;
     saving: boolean;
   };
 
@@ -88,6 +89,7 @@
       event: ev,
       jiraInput: '',
       matchInput: deriveMatchSuggestion(ev.title),
+      skipInput: false,
       saving: false,
     }));
   }
@@ -118,11 +120,17 @@
 
   async function saveMapping(row: UnmappedRow) {
     if (!preview) return;
-    const jira = row.jiraInput.trim().toUpperCase();
     const match = row.matchInput.trim();
-    if (!/^[A-Z][A-Z0-9]+-\d+$/.test(jira) || !match) return;
-    row.saving = true;
-    await addUserMeetingMapping({ match, jiraKey: jira });
+    if (!match) return;
+    if (!row.skipInput) {
+      const jira = row.jiraInput.trim().toUpperCase();
+      if (!/^[A-Z][A-Z0-9]+-\d+$/.test(jira)) return;
+      row.saving = true;
+      await addUserMeetingMapping({ match, jiraKey: jira });
+    } else {
+      row.saving = true;
+      await addUserMeetingMapping({ match, jiraKey: '', skip: true });
+    }
     const fresh = await reaggregate(
       preview.cachedFetch,
       preview.existingWorklogs,
@@ -301,7 +309,7 @@
           {/if}
         </div>
         <div class="text-[11px] text-gray-500">
-          {rows.length} entries · {rows.filter((r) => r.alreadyLogged).length} already logged · {unmapped.length} unmapped · {preview.skippedAllDay} all-day skipped · {preview.skippedByAttendance} declined skipped
+          {rows.length} entries · {rows.filter((r) => r.alreadyLogged).length} already logged · {unmapped.length} unmapped · {preview.skippedByMapping} skipped by mapping · {preview.skippedAllDay} all-day · {preview.skippedByAttendance} declined
         </div>
       </div>
 
@@ -362,22 +370,37 @@
                 <div class="text-[10px] text-gray-500 mb-1.5">
                   {new Date(u.event.startMs).toLocaleString()} · {u.event.durationMinutes}m
                 </div>
-                <div class="flex gap-1.5 items-start">
+                <div class="flex gap-1.5 items-center">
                   <input
                     type="text"
                     placeholder="match substring"
                     bind:value={u.matchInput}
                     class="flex-1 px-1.5 py-1 border border-gray-300 rounded text-[11px]"
                   />
-                  <div class="w-36">
+                  <div class="w-32">
                     <JiraPicker
                       bind:value={u.jiraInput}
                       favorites={preview?.favorites ?? []}
+                      disabled={u.skipInput}
                     />
                   </div>
+                  <label
+                    class="flex items-center gap-0.5 text-[10px] text-gray-700 cursor-pointer shrink-0"
+                    title="Drop this meeting — don't log it"
+                  >
+                    <input
+                      type="checkbox"
+                      class="accent-amber-600 w-3 h-3"
+                      bind:checked={u.skipInput}
+                    />
+                    Skip
+                  </label>
                   <button
-                    class="px-2 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white text-[11px] rounded"
-                    disabled={u.saving || !/^[A-Z][A-Z0-9]+-\d+$/i.test(u.jiraInput.trim()) || !u.matchInput.trim()}
+                    class="px-2 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white text-[11px] rounded shrink-0"
+                    disabled={u.saving ||
+                      !u.matchInput.trim() ||
+                      (!u.skipInput &&
+                        !/^[A-Z][A-Z0-9]+-\d+$/i.test(u.jiraInput.trim()))}
                     onclick={() => saveMapping(u)}
                   >
                     {u.saving ? '…' : 'Save'}

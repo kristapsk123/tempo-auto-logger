@@ -44,6 +44,7 @@ export interface AggregatorOutput {
   unmappedMeetings: CalendarEvent[];
   skippedByAttendance: number;
   skippedAllDay: number;
+  skippedByMapping: number;
 }
 
 function resolveTemplate(
@@ -142,6 +143,7 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
   const unmappedMeetings: CalendarEvent[] = [];
   let skippedByAttendance = 0;
   let skippedAllDay = 0;
+  let skippedByMapping = 0;
 
   const commitGroups = new Map<
     string,
@@ -241,6 +243,10 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
       unmappedMeetings.push(ev);
       continue;
     }
+    if (match.mapping.skip === true) {
+      skippedByMapping += 1;
+      continue;
+    }
 
     const issueKey = match.mapping.jiraKey;
     const description =
@@ -272,5 +278,11 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     return (a.issueKey ?? '').localeCompare(b.issueKey ?? '');
   });
 
-  return { entries, unmappedMeetings, skippedByAttendance, skippedAllDay };
+  return {
+    entries,
+    unmappedMeetings,
+    skippedByAttendance,
+    skippedAllDay,
+    skippedByMapping,
+  };
 }
