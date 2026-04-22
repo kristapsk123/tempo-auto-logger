@@ -34,6 +34,7 @@ export interface JiraIssueOption {
   key: string;
   summary: string;
   sectionLabel?: string;
+  isFavorite?: boolean;
 }
 
 interface IssuePickerResponse {

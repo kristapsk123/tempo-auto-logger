@@ -19,14 +19,20 @@
 
   let filtered = $derived.by(() => {
     const q = value.trim().toLowerCase();
-    if (!q) return favorites.slice(0, 20);
-    return favorites
-      .filter(
-        (f) =>
-          f.key.toLowerCase().includes(q) ||
-          f.summary.toLowerCase().includes(q),
-      )
-      .slice(0, 20);
+    const matching = q
+      ? favorites.filter(
+          (f) =>
+            f.key.toLowerCase().includes(q) ||
+            f.summary.toLowerCase().includes(q),
+        )
+      : favorites.slice();
+    // Stable sort: Tempo favorites first, rest keep incoming order.
+    matching.sort((a, b) => {
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      return 0;
+    });
+    return matching.slice(0, 20);
   });
 
   function pick(key: string) {
@@ -56,16 +62,18 @@
       {#each filtered as fav (fav.key)}
         <button
           type="button"
-          title={fav.summary || fav.key}
-          class="w-full text-left px-2 py-1.5 hover:bg-blue-50 flex gap-2 items-baseline text-[11px] border-b border-gray-100 last:border-0 {fav.sectionLabel ===
-          'Previously used'
-            ? 'border-l-2 border-l-amber-400'
-            : ''}"
+          title={fav.isFavorite
+            ? `⭐ Favorite — ${fav.summary || fav.key}`
+            : fav.summary || fav.key}
+          class="w-full text-left px-2 py-1.5 hover:bg-blue-50 flex gap-1.5 items-baseline text-[11px] border-b border-gray-100 last:border-0"
           onmousedown={(e) => {
             e.preventDefault();
             pick(fav.key);
           }}
         >
+          <span class="shrink-0 w-3 text-center">
+            {#if fav.isFavorite}⭐{/if}
+          </span>
           <span class="text-blue-600 font-mono shrink-0 w-20">{fav.key}</span>
           <span class="text-gray-700 truncate flex-1 font-sans">
             {fav.summary || '(no summary)'}
