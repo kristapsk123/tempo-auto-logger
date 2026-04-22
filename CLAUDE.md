@@ -160,11 +160,14 @@ These were agreed with the user; don't relitigate unless they ask:
   opens, but preserved across re-aggregation (e.g. after saving an
   unmapped meeting mapping) via `rebuildRows` merging them back in.
   Posted comment is verbatim (no sig tag).
-- **Editable minutes:** every row's `minutes` is a `type=number` input
-  bound to `r.entry.minutes`, so the user can adjust before posting.
-  Spinner arrows are hidden via scoped CSS in `Popup.svelte`. The
-  popup footer shows a running total of included, not-yet-posted rows
-  as `Xh Ym` (via `formatDuration`).
+- **Editable time:** each row has two `type=number` inputs for hours
+  and minutes, labelled `h` and `m`. Both bind to `RowState.hoursInput`
+  / `RowState.minutesInput` and sync to `r.entry.minutes` on each
+  `oninput` via `syncRowMinutes()`. `entry.minutes` stays the source
+  of truth for posting and the footer total. Spinner arrows are
+  hidden via scoped CSS in `Popup.svelte`. The footer shows a running
+  total of included, not-yet-posted rows as `Xh Ym` via
+  `formatDuration`.
 - **Distribution:** unpacked extension from this git repo. `npm run
   build`, load `dist/` at `chrome://extensions`.
 

@@ -21,6 +21,10 @@
     alreadyLogged: boolean;
     postStatus: 'idle' | 'posting' | 'ok' | 'fail';
     postError?: string;
+    // hoursInput / minutesInput drive the two-field h/m editor. entry.minutes
+    // stays the source of truth for posting and the footer total.
+    hoursInput: number;
+    minutesInput: number;
   };
 
   type UnmappedRow = {
@@ -125,6 +129,8 @@
         include: !p.alreadyLoggedIds.has(e.id),
         alreadyLogged: p.alreadyLoggedIds.has(e.id),
         postStatus: 'idle' as const,
+        hoursInput: Math.floor(e.minutes / 60),
+        minutesInput: e.minutes % 60,
       })),
       ...manual,
     ];
@@ -156,12 +162,20 @@
         include: true,
         alreadyLogged: false,
         postStatus: 'idle',
+        hoursInput: 0,
+        minutesInput: 30,
       },
     ];
   }
 
   function removeManualRow(id: string) {
     rows = rows.filter((r) => r.entry.id !== id);
+  }
+
+  function syncRowMinutes(row: RowState) {
+    const h = Math.max(0, Number(row.hoursInput) || 0);
+    const m = Math.max(0, Number(row.minutesInput) || 0);
+    row.entry.minutes = h * 60 + m;
   }
 
   async function load(dateFrom: string, dateTo: string) {
@@ -481,15 +495,28 @@
                 {r.entry.issueKey ?? '—'}
               </span>
             {/if}
-            <input
-              type="number"
-              min="1"
-              step="5"
-              class="shrink-0 w-14 px-1 py-0.5 border border-gray-300 rounded text-right font-mono text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500"
-              bind:value={r.entry.minutes}
-              disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
-              title="Minutes"
-            />
+            <div class="shrink-0 flex items-center gap-0.5" title="Hours and minutes">
+              <input
+                type="number"
+                min="0"
+                class="w-9 px-1 py-0.5 border border-gray-300 rounded text-right font-mono text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500"
+                bind:value={r.hoursInput}
+                oninput={() => syncRowMinutes(r)}
+                disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
+                aria-label="Hours"
+              />
+              <span class="text-[10px] text-gray-500">h</span>
+              <input
+                type="number"
+                min="0"
+                class="w-9 px-1 py-0.5 border border-gray-300 rounded text-right font-mono text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500"
+                bind:value={r.minutesInput}
+                oninput={() => syncRowMinutes(r)}
+                disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
+                aria-label="Minutes"
+              />
+              <span class="text-[10px] text-gray-500">m</span>
+            </div>
             {#if r.entry.source === 'manual'}
               <input
                 type="text"
