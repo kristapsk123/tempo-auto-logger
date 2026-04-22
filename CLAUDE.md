@@ -140,13 +140,31 @@ These were agreed with the user; don't relitigate unless they ask:
   stable marker, or (legacy fallback) the stripped comment matches.
 - **Comment format:** `[auto] {human text} [#sig:<type>-<id>]`. The sig
   tag is auto-appended; templates control the human text part.
-  **Exception:** when a meeting mapping has a custom `description`
-  field, that description is used verbatim — no template, no `[auto]`
-  prefix, no `[#sig:…]` tag — because users want their custom text to
-  appear exactly as they wrote it in Tempo. Dedupe falls back to
-  exact-comment matching (after stripping any sig tag) for those
-  entries; `computeAlreadyLogged` no longer requires worklog comments
-  to start with `[auto]`.
+  **Exceptions (all share the same verbatim rule — no template
+  substitution beyond placeholders, no `[auto]` prefix, no `[#sig:…]`
+  tag):**
+  1. A meeting mapping has a custom `description` field.
+  2. The user has overridden the commit/review/meeting template in
+     Settings → Templates (detected by `userDescriptionTemplates.<type>`
+     being a string — `saveTemplates` only writes overrides that differ
+     from the team default).
+  3. Manual entries added via "+ Add manual entry" in the popup.
+
+  Dedupe falls back to exact-comment matching (after stripping any sig
+  tag) for these entries; `computeAlreadyLogged` no longer requires
+  worklog comments to start with `[auto]`.
+- **Manual entries:** the popup has an "+ Add manual entry" button that
+  appends a row with an editable date, Jira picker, minutes, and
+  description. Source is `'manual'`, icon `✎`, color indigo. These rows
+  live only in the popup's `rows` state — not persisted across popup
+  opens, but preserved across re-aggregation (e.g. after saving an
+  unmapped meeting mapping) via `rebuildRows` merging them back in.
+  Posted comment is verbatim (no sig tag).
+- **Editable minutes:** every row's `minutes` is a `type=number` input
+  bound to `r.entry.minutes`, so the user can adjust before posting.
+  Spinner arrows are hidden via scoped CSS in `Popup.svelte`. The
+  popup footer shows a running total of included, not-yet-posted rows
+  as `Xh Ym` (via `formatDuration`).
 - **Distribution:** unpacked extension from this git repo. `npm run
   build`, load `dist/` at `chrome://extensions`.
 
@@ -210,6 +228,7 @@ push to `origin/master`.
 - Onboarding wizard (install-triggered full-page walkthrough)
 - Custom icons (uses Chrome's default puzzle-piece)
 - Custom date range picker in popup (only yesterday / today quick buttons)
-- Manual-entry row in preview for deep work that didn't leave a digital
-  trace (user decided they'd add those directly in Tempo)
 - Retry button for failed post entries (just shows red ✗ with tooltip)
+- Persisting manual entries across popup opens (they currently live in
+  in-memory state and are gone after a reload — explicitly agreed that's
+  OK for now)
