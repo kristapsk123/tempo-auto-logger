@@ -22,8 +22,10 @@ import {
   type CalendarEvent,
 } from './calendar-client';
 import {
+  getAttendanceFilter,
   getGithubToken,
   getUserMeetingMappings,
+  getUserTemplates,
 } from './storage';
 import { AUTO_COMMENT_PREFIX } from './config';
 import teamDefaults from '../../team-defaults.json';
@@ -69,7 +71,11 @@ export async function loadPreview(
     throw new Error('No GitHub PAT saved — paste one in the field above first');
   }
   const user = await getGithubUser(token);
-  const userMappings = await getUserMeetingMappings();
+  const [userMappings, attendanceFilter, userTemplates] = await Promise.all([
+    getUserMeetingMappings(),
+    getAttendanceFilter(),
+    getUserTemplates(),
+  ]);
   const orgs = githubOrgsConfig.orgs;
   const timeZone =
     Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Europe/Riga';
@@ -91,7 +97,8 @@ export async function loadPreview(
     events,
     teamDefaults,
     userMeetingMappings: userMappings,
-    attendanceFilter: 'all-except-declined',
+    userDescriptionTemplates: userTemplates,
+    attendanceFilter,
     timeZone,
     dateFrom,
     dateTo,
@@ -119,14 +126,19 @@ export async function reaggregate(
   dateFrom: string,
   dateTo: string,
 ): Promise<ReaggregatedPreview> {
-  const userMappings = await getUserMeetingMappings();
+  const [userMappings, attendanceFilter, userTemplates] = await Promise.all([
+    getUserMeetingMappings(),
+    getAttendanceFilter(),
+    getUserTemplates(),
+  ]);
   const aggregated = aggregate({
     commits: cached.commits,
     reviews: cached.reviews,
     events: cached.events,
     teamDefaults,
     userMeetingMappings: userMappings,
-    attendanceFilter: 'all-except-declined',
+    userDescriptionTemplates: userTemplates,
+    attendanceFilter,
     timeZone: cached.timeZone,
     dateFrom,
     dateTo,
