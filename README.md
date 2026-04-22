@@ -1,6 +1,6 @@
 # tempo-auto-logger
 
-Chrome extension that auto-logs time to Jira Tempo from your GitHub activity and Google Calendar meetings.
+Chrome extention that auto-logs time to Jira Tempo from your GitHub activity and Google Calendar meetings.
 
 ## Status
 
