@@ -14,7 +14,13 @@ Chrome extension that auto-logs time to Jira Tempo from your GitHub activity and
 - **Time rules** — commits: 1 min per Jira issue per day. Reviews: 15 min per PR per day. Meetings: exact calendar duration.
 - **Preview** — before any POST to Tempo, a preview screen shows every entry with a per-row include/exclude checkbox. Entries are deduped against existing Tempo worklogs by comparing the issue/date and the comment text (with a legacy `[#sig:…]` marker still recognized for entries posted before this simplification).
 
-## Setup
+## Install (just use it)
+
+If you just want to use the extension, see **[INSTALL.md](INSTALL.md)** — a
+step-by-step guide with no coding required. Ask Kristaps for the latest
+`.zip`.
+
+## Developer setup (build from source)
 
 ```bash
 npm install
@@ -29,6 +35,9 @@ Then in Chrome:
 4. Select the `dist/` folder
 
 The popup appears when you click the extension icon. Settings live on the options page (gear icon in the popup, or right-click the extension icon → Options).
+
+For a production build without HMR: `npm run build`. Type-check with
+`npm run check` (must be 0 errors, 0 warnings before committing).
 
 ## Project layout
 
