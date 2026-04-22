@@ -49,6 +49,32 @@ interface IssuePickerResponse {
 }
 
 /**
+ * Batch-fetch summaries for the given issue keys via JQL search.
+ * Returns a map of key -> summary for issues that were found.
+ */
+export async function fetchIssueSummaries(
+  keys: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (keys.length === 0) return out;
+  const jql = `issueKey in (${keys.map((k) => `"${k}"`).join(',')})`;
+  const params = new URLSearchParams({
+    jql,
+    fields: 'summary',
+    maxResults: String(Math.max(keys.length, 50)),
+  });
+  const res = await jiraFetch(`/rest/api/2/search?${params}`);
+  if (!res.ok) return out;
+  const data = (await res.json()) as {
+    issues?: Array<{ key?: string; fields?: { summary?: string } }>;
+  };
+  for (const iss of data.issues ?? []) {
+    if (iss.key) out.set(iss.key, iss.fields?.summary ?? '');
+  }
+  return out;
+}
+
+/**
  * Uses Jira's issue-picker endpoint — same one the "link to issue" dialog uses.
  * Without a query, returns the user's recent/suggested issues ("History Search").
  * With a query, returns matching issues.

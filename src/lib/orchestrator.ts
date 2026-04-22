@@ -5,6 +5,7 @@ import {
   type WorklogEntry,
 } from './aggregator';
 import {
+  fetchIssueSummaries,
   getMyself,
   searchIssuePicker,
   type JiraIssueOption,
@@ -102,7 +103,11 @@ export async function loadPreview(
     ],
   );
 
-  const favorites = mergeFavorites(jiraFavorites, userMappings.map((m) => m.jiraKey));
+  const favorites = mergeFavorites(
+    jiraFavorites,
+    userMappings.map((m) => m.jiraKey),
+  );
+  await fillMissingSummaries(favorites);
 
   const aggregated = aggregate({
     commits,
@@ -139,7 +144,22 @@ export async function loadFavorites(): Promise<JiraIssueOption[]> {
     searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
     getUserMeetingMappings(),
   ]);
-  return mergeFavorites(fromJira, mappings.map((m) => m.jiraKey));
+  const merged = mergeFavorites(fromJira, mappings.map((m) => m.jiraKey));
+  await fillMissingSummaries(merged);
+  return merged;
+}
+
+async function fillMissingSummaries(items: JiraIssueOption[]): Promise<void> {
+  const needed = items.filter((i) => !i.summary).map((i) => i.key);
+  if (needed.length === 0) return;
+  const summaries = await fetchIssueSummaries(needed).catch(
+    () => new Map<string, string>(),
+  );
+  for (const item of items) {
+    if (!item.summary && summaries.has(item.key)) {
+      item.summary = summaries.get(item.key) ?? '';
+    }
+  }
 }
 
 function mergeFavorites(
