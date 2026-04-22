@@ -12,6 +12,8 @@
     setUserTemplates,
   } from '../lib/storage';
   import { aggregate } from '../lib/aggregator';
+  import { loadFavorites, type JiraIssueOption } from '../lib/orchestrator';
+  import JiraPicker from '../components/JiraPicker.svelte';
   import type {
     AttendanceFilter,
     DescriptionTemplates,
@@ -64,6 +66,9 @@
   });
   let templateSavedFlash = $state(false);
 
+  // Favorites from Jira (+ previously used) for the picker
+  let favorites = $state<JiraIssueOption[]>([]);
+
   $effect(() => {
     void (async () => {
       const [af, mappings, token, userT] = await Promise.all([
@@ -93,6 +98,15 @@
         review: userT.review ?? teamDefaults.descriptionTemplates.review,
         meeting: userT.meeting ?? teamDefaults.descriptionTemplates.meeting,
       };
+
+      // Non-critical: fetch favorites for the Jira picker
+      loadFavorites()
+        .then((f) => {
+          favorites = f;
+        })
+        .catch(() => {
+          favorites = [];
+        });
     })();
   });
 
@@ -345,15 +359,12 @@
                       : 'border-gray-300'}"
                   />
                 </div>
-                <div class="w-32">
-                  <input
-                    type="text"
-                    placeholder="NUMO-1234"
+                <div class="w-40">
+                  <JiraPicker
                     bind:value={row.jiraKey}
-                    oninput={onMappingChange}
-                    class="w-full px-2 py-1.5 border rounded text-sm font-mono uppercase {row.invalidJira
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-gray-300'}"
+                    {favorites}
+                    inputClass={row.invalidJira ? 'border-red-400 bg-red-50' : ''}
+                    onchange={onMappingChange}
                   />
                 </div>
                 <div class="flex-1">

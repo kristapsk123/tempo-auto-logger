@@ -29,3 +29,56 @@ export async function getIssue(key: string): Promise<JiraIssue | null> {
   if (!res.ok) throw new Error(`getIssue(${key}) failed: ${res.status}`);
   return res.json();
 }
+
+export interface JiraIssueOption {
+  key: string;
+  summary: string;
+  sectionLabel?: string;
+}
+
+interface IssuePickerResponse {
+  sections?: Array<{
+    id?: string;
+    label?: string;
+    issues?: Array<{
+      key: string;
+      summary?: string;
+      summaryText?: string;
+    }>;
+  }>;
+}
+
+/**
+ * Uses Jira's issue-picker endpoint — same one the "link to issue" dialog uses.
+ * Without a query, returns the user's recent/suggested issues ("History Search").
+ * With a query, returns matching issues.
+ */
+export async function searchIssuePicker(
+  query: string = '',
+  limit: number = 20,
+): Promise<JiraIssueOption[]> {
+  const params = new URLSearchParams({
+    query,
+    showSubTasks: 'true',
+    showSubTaskParent: 'true',
+  });
+  const res = await jiraFetch(`/rest/api/2/issue/picker?${params}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as IssuePickerResponse;
+
+  const out: JiraIssueOption[] = [];
+  const seen = new Set<string>();
+  for (const section of data.sections ?? []) {
+    for (const iss of section.issues ?? []) {
+      if (!iss.key || seen.has(iss.key)) continue;
+      seen.add(iss.key);
+      out.push({
+        key: iss.key,
+        summary: iss.summaryText ?? iss.summary ?? '',
+        sectionLabel: section.label,
+      });
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}

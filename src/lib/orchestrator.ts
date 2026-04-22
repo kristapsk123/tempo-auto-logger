@@ -4,7 +4,13 @@ import {
   stripSignature,
   type WorklogEntry,
 } from './aggregator';
-import { getMyself } from './jira-client';
+import {
+  getMyself,
+  searchIssuePicker,
+  type JiraIssueOption,
+} from './jira-client';
+
+export type { JiraIssueOption } from './jira-client';
 import {
   createWorklog,
   listWorklogs,
@@ -48,6 +54,7 @@ export interface LoadedPreview {
   existingWorklogs: TempoWorklog[];
   alreadyLoggedIds: Set<string>;
   jiraUsername: string;
+  favorites: JiraIssueOption[];
   cachedFetch: CachedFetch;
 }
 
@@ -80,16 +87,22 @@ export async function loadPreview(
   const timeZone =
     Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Europe/Riga';
 
-  const [commits, reviews, events, existing] = await Promise.all([
-    searchMyCommits({ token, username: user.login, orgs, dateFrom, dateTo }),
-    listMyReviews({ token, username: user.login, orgs, dateFrom, dateTo }),
-    listCalendarEvents({
-      userEmail: me.emailAddress,
-      dateFrom,
-      dateTo,
-    }),
-    listWorklogs({ usernames: [me.name], dateFrom, dateTo }),
-  ]);
+  const [commits, reviews, events, existing, jiraFavorites] = await Promise.all(
+    [
+      searchMyCommits({ token, username: user.login, orgs, dateFrom, dateTo }),
+      listMyReviews({ token, username: user.login, orgs, dateFrom, dateTo }),
+      listCalendarEvents({
+        userEmail: me.emailAddress,
+        dateFrom,
+        dateTo,
+      }),
+      listWorklogs({ usernames: [me.name], dateFrom, dateTo }),
+      // Non-critical; fall back to empty list if the endpoint fails
+      searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
+    ],
+  );
+
+  const favorites = mergeFavorites(jiraFavorites, userMappings.map((m) => m.jiraKey));
 
   const aggregated = aggregate({
     commits,
@@ -116,8 +129,48 @@ export async function loadPreview(
     existingWorklogs: existing,
     alreadyLoggedIds,
     jiraUsername: me.name,
+    favorites,
     cachedFetch: { commits, reviews, events, timeZone },
   };
+}
+
+export async function loadFavorites(): Promise<JiraIssueOption[]> {
+  const [fromJira, mappings] = await Promise.all([
+    searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
+    getUserMeetingMappings(),
+  ]);
+  return mergeFavorites(fromJira, mappings.map((m) => m.jiraKey));
+}
+
+function mergeFavorites(
+  fromJira: JiraIssueOption[],
+  userMappingKeys: string[],
+): JiraIssueOption[] {
+  // Put user's previously-mapped Jiras first (they're tried-and-true),
+  // then the rest of Jira's picker suggestions. Dedupe by key.
+  const seen = new Set<string>();
+  const out: JiraIssueOption[] = [];
+
+  // Previously used: try to match them with summaries from the picker result
+  const pickerMap = new Map(fromJira.map((i) => [i.key, i]));
+  for (const key of userMappingKeys) {
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const fromPicker = pickerMap.get(key);
+    out.push({
+      key,
+      summary: fromPicker?.summary ?? '',
+      sectionLabel: 'Previously used',
+    });
+  }
+
+  for (const iss of fromJira) {
+    if (seen.has(iss.key)) continue;
+    seen.add(iss.key);
+    out.push(iss);
+  }
+
+  return out;
 }
 
 export async function reaggregate(
