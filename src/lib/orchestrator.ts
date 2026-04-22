@@ -277,9 +277,9 @@ function computeAlreadyLogged(
         already.add(e.id);
         break;
       }
-      // 2. Exact-match after stripping any sig — covers both legacy
-      // [auto]-prefixed entries and custom-description mappings where we
-      // deliberately don't attach a sig.
+      // 2. Exact-match after stripping any sig — handles both new entries
+      // (which no longer carry a sig tag) and legacy [auto]-prefixed ones
+      // that lost their sig.
       if (stripSignature(w.comment) === humanOnly) {
         already.add(e.id);
         break;

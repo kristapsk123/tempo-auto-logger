@@ -88,10 +88,6 @@ export function stripSignature(comment: string): string {
   return comment.replace(SIG_REGEX, '');
 }
 
-function appendSignature(comment: string, signature: string): string {
-  return `${stripSignature(comment)} [#sig:${signature}]`;
-}
-
 function localDate(ms: number, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
@@ -139,15 +135,10 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     input.userDescriptionTemplates,
   );
 
-  // When the user has overridden a template in Settings → Templates, we treat
-  // that text as verbatim and skip the [#sig:…] tag — same rule meeting
-  // custom-descriptions already follow. Dedupe falls back to exact-comment
-  // matching (see computeAlreadyLogged).
-  const isCustomTemplate = {
-    commit: typeof input.userDescriptionTemplates?.commit === 'string',
-    review: typeof input.userDescriptionTemplates?.review === 'string',
-    meeting: typeof input.userDescriptionTemplates?.meeting === 'string',
-  };
+  // Comments are posted verbatim — no [auto] prefix, no [#sig:…] tag.
+  // Dedupe relies on (a) sig-marker detection in legacy Tempo entries that
+  // were posted before this change, and (b) exact-comment matching for new
+  // entries. See orchestrator.computeAlreadyLogged.
 
   const entries: WorklogEntry[] = [];
   const unmappedMeetings: CalendarEvent[] = [];
@@ -169,15 +160,12 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     }
   }
   for (const { date, issueKey, count } of commitGroups.values()) {
-    const filled = fillTemplate(templates.commit, { issue: issueKey });
     entries.push({
       id: `commit:${date}:${issueKey}`,
       date,
       issueKey,
       minutes: input.teamDefaults.defaultMinutes.commitPerIssuePerDay,
-      comment: isCustomTemplate.commit
-        ? filled
-        : appendSignature(filled, `commit-${issueKey}`),
+      comment: fillTemplate(templates.commit, { issue: issueKey }),
       source: 'commit',
       include: true,
       sourceInfo: { commitCount: count },
@@ -207,19 +195,16 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     }
   }
   for (const g of reviewGroups.values()) {
-    const filled = fillTemplate(templates.review, {
-      issue: g.jiraKey,
-      prNum: g.prNumber,
-      prTitle: g.prTitle,
-    });
     entries.push({
       id: `review:${g.date}:${g.repo}#${g.prNumber}`,
       date: g.date,
       issueKey: g.jiraKey,
       minutes: input.teamDefaults.defaultMinutes.reviewPerPrPerDay,
-      comment: isCustomTemplate.review
-        ? filled
-        : appendSignature(filled, `review-pr${g.prNumber}`),
+      comment: fillTemplate(templates.review, {
+        issue: g.jiraKey,
+        prNum: g.prNumber,
+        prTitle: g.prTitle,
+      }),
       source: 'review',
       include: true,
       sourceInfo: {
@@ -263,20 +248,12 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
       typeof match.mapping.description === 'string' &&
       match.mapping.description.length > 0;
 
-    // When the user sets a per-mapping description we respect it verbatim —
-    // no template, no [auto] prefix, no [#sig:…] tag. Same rule applies when
-    // the meeting template itself has been overridden in Settings → Templates.
-    // Dedupe falls back to exact-comment matching for these (see
-    // orchestrator.computeAlreadyLogged).
-    const filledMeeting = fillTemplate(templates.meeting, {
-      title: ev.title,
-      issue: issueKey,
-    });
     const comment = hasCustomDescription
       ? match.mapping.description!
-      : isCustomTemplate.meeting
-        ? filledMeeting
-        : appendSignature(filledMeeting, `meeting-${ev.id}`);
+      : fillTemplate(templates.meeting, {
+          title: ev.title,
+          issue: issueKey,
+        });
 
     entries.push({
       id: `meeting:${ev.id}`,

@@ -12,7 +12,7 @@ Chrome extension that auto-logs time to Jira Tempo from your GitHub activity and
 - **GitHub** — scans configured orgs (`github-orgs.json`) for commits you authored and reviews you submitted. Extracts Jira keys from PR title → branch name → commit message.
 - **Calendar** — reads events from `calendar.google.com` for the chosen date range. Meeting → Jira mapping is substring-based and learns over time (team defaults in repo + per-user overrides in local storage).
 - **Time rules** — commits: 1 min per Jira issue per day. Reviews: 15 min per PR per day. Meetings: exact calendar duration.
-- **Preview** — before any POST to Tempo, a preview screen shows every entry with a per-row include/exclude checkbox. Entries are deduped against existing Tempo worklogs via an `[auto]` prefix in the comment.
+- **Preview** — before any POST to Tempo, a preview screen shows every entry with a per-row include/exclude checkbox. Entries are deduped against existing Tempo worklogs by comparing the issue/date and the comment text (with a legacy `[#sig:…]` marker still recognized for entries posted before this simplification).
 
 ## Setup
 

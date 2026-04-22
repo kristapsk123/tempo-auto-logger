@@ -83,7 +83,7 @@ src/
     JiraPicker.svelte       Reusable combobox for picking Jira keys
                             with favorites / recent issues dropdown
   lib/
-    config.ts               Base URLs, [auto] comment prefix constant
+    config.ts               Base URLs
     http.ts                 jiraFetch() helper, SessionExpiredError
     storage.ts              chrome.storage.local wrappers for user
                             settings (PAT, mappings, attendance filter,
@@ -135,24 +135,25 @@ These were agreed with the user; don't relitigate unless they ask:
 - **Jira key extraction from GitHub activity:** PR title → branch →
   commit message (first match wins).
 - **Date range cap:** 30 days (not currently exposed in UI).
-- **Dedupe:** existing Tempo worklogs are checked; skip if a worklog on
-  the same issue/date has a comment with our `[#sig:<type>-<id>]`
-  stable marker, or (legacy fallback) the stripped comment matches.
-- **Comment format:** `[auto] {human text} [#sig:<type>-<id>]`. The sig
-  tag is auto-appended; templates control the human text part.
-  **Exceptions (all share the same verbatim rule — no template
-  substitution beyond placeholders, no `[auto]` prefix, no `[#sig:…]`
-  tag):**
-  1. A meeting mapping has a custom `description` field.
-  2. The user has overridden the commit/review/meeting template in
-     Settings → Templates (detected by `userDescriptionTemplates.<type>`
-     being a string — `saveTemplates` only writes overrides that differ
-     from the team default).
-  3. Manual entries added via "+ Add manual entry" in the popup.
+- **Comment format:** comments are posted to Tempo **verbatim** — no
+  `[auto]` prefix, no `[#sig:…]` tag. Templates (team defaults or user
+  overrides) are simple placeholder-substituted strings, e.g.
+  `"Commits on {issue}"`, `"{title}"`. Manual entries and meeting
+  mappings with a custom `description` are already verbatim by nature.
+  `appendSignature` and the `AUTO_COMMENT_PREFIX` constant have been
+  removed.
+- **Dedupe:** existing Tempo worklogs on the same issue/date are
+  checked in two passes (see `orchestrator.computeAlreadyLogged`):
+  1. **Legacy sig-marker:** if an existing comment contains
+     `[#sig:<type>-<id>]` matching `computeSignature(entry)`, treat it
+     as already logged. Handles entries posted before the verbatim
+     simplification.
+  2. **Exact-comment:** `stripSignature(existing) === stripSignature(new)`.
+     Handles new entries and any custom-description / manual-entry
+     case.
 
-  Dedupe falls back to exact-comment matching (after stripping any sig
-  tag) for these entries; `computeAlreadyLogged` no longer requires
-  worklog comments to start with `[auto]`.
+  `computeSignature` and `stripSignature` are kept for pass 1 and for
+  future robustness, but new entries no longer carry a sig.
 - **Manual entries:** the popup has an "+ Add manual entry" button that
   appends a row with an editable date, Jira picker, minutes, and
   description. Source is `'manual'`, icon `✎`, color indigo. These rows

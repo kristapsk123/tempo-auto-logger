@@ -556,9 +556,10 @@
             <code>{'{issue}'}</code>, <code>{'{prNum}'}</code>,
             <code>{'{prTitle}'}</code>, <code>{'{title}'}</code> (meeting title).
             Your edits are saved locally and override the team defaults.
-            When you override a template, the comment is used verbatim —
-            no <code>[#sig:…]</code> tag is appended (dedupe falls back to
-            exact-comment match). Team defaults still get the tag.
+            Comments are posted to Tempo verbatim — no extra prefix or
+            tag is appended. Dedupe on re-run compares worklog comments
+            by exact match (plus a legacy sig-marker check for entries
+            posted before this simplification).
           </p>
 
           <div class="space-y-4">
@@ -628,7 +629,7 @@
               <li>Own commits → 1 min per Jira issue per day</li>
               <li>Submitted PR reviews → 15 min per PR per day (PRs you didn't author)</li>
               <li>Meetings → exact calendar duration, with Jira mapping by title substring</li>
-              <li>Dedupe: existing <code>[auto]</code>-prefixed Tempo entries are detected via a <code>[#sig:…]</code> tag and skipped on re-run</li>
+              <li>Dedupe: existing Tempo entries with the same issue/date/comment are detected and skipped on re-run (legacy <code>[#sig:…]</code> tags still recognized)</li>
             </ul>
             <p class="pt-2 border-t border-gray-200">
               <a
