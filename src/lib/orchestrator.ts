@@ -14,6 +14,7 @@ import {
 export type { JiraIssueOption } from './jira-client';
 import {
   createWorklog,
+  getTempoFavoriteIssueKeys,
   listWorklogs,
   type TempoWorklog,
 } from './tempo-client';
@@ -88,8 +89,8 @@ export async function loadPreview(
   const timeZone =
     Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Europe/Riga';
 
-  const [commits, reviews, events, existing, jiraFavorites] = await Promise.all(
-    [
+  const [commits, reviews, events, existing, jiraRecent, tempoFavoriteKeys] =
+    await Promise.all([
       searchMyCommits({ token, username: user.login, orgs, dateFrom, dateTo }),
       listMyReviews({ token, username: user.login, orgs, dateFrom, dateTo }),
       listCalendarEvents({
@@ -98,14 +99,15 @@ export async function loadPreview(
         dateTo,
       }),
       listWorklogs({ usernames: [me.name], dateFrom, dateTo }),
-      // Non-critical; fall back to empty list if the endpoint fails
+      // Both favorites lookups are non-critical; fall back to empty
       searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
-    ],
-  );
+      getTempoFavoriteIssueKeys().catch(() => [] as string[]),
+    ]);
 
   const favorites = mergeFavorites(
-    jiraFavorites,
+    jiraRecent,
     userMappings.map((m) => m.jiraKey),
+    tempoFavoriteKeys,
   );
   await fillMissingSummaries(favorites);
 
@@ -140,11 +142,16 @@ export async function loadPreview(
 }
 
 export async function loadFavorites(): Promise<JiraIssueOption[]> {
-  const [fromJira, mappings] = await Promise.all([
+  const [fromJira, mappings, tempoFavoriteKeys] = await Promise.all([
     searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
     getUserMeetingMappings(),
+    getTempoFavoriteIssueKeys().catch(() => [] as string[]),
   ]);
-  const merged = mergeFavorites(fromJira, mappings.map((m) => m.jiraKey));
+  const merged = mergeFavorites(
+    fromJira,
+    mappings.map((m) => m.jiraKey),
+    tempoFavoriteKeys,
+  );
   await fillMissingSummaries(merged);
   return merged;
 }
@@ -165,14 +172,27 @@ async function fillMissingSummaries(items: JiraIssueOption[]): Promise<void> {
 function mergeFavorites(
   fromJira: JiraIssueOption[],
   userMappingKeys: string[],
+  tempoFavoriteKeys: string[],
 ): JiraIssueOption[] {
-  // Put user's previously-mapped Jiras first (they're tried-and-true),
-  // then the rest of Jira's picker suggestions. Dedupe by key.
+  const favoriteSet = new Set(tempoFavoriteKeys);
+  const pickerMap = new Map(fromJira.map((i) => [i.key, i]));
   const seen = new Set<string>();
   const out: JiraIssueOption[] = [];
 
-  // Previously used: try to match them with summaries from the picker result
-  const pickerMap = new Map(fromJira.map((i) => [i.key, i]));
+  // 1. Tempo favorites first, always, with ⭐.
+  for (const key of tempoFavoriteKeys) {
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const fromPicker = pickerMap.get(key);
+    out.push({
+      key,
+      summary: fromPicker?.summary ?? '',
+      isFavorite: true,
+      sectionLabel: 'Favorite',
+    });
+  }
+
+  // 2. Previously used (not already added as a favorite).
   for (const key of userMappingKeys) {
     if (!key || seen.has(key)) continue;
     seen.add(key);
@@ -180,14 +200,19 @@ function mergeFavorites(
     out.push({
       key,
       summary: fromPicker?.summary ?? '',
+      isFavorite: false,
       sectionLabel: 'Previously used',
     });
   }
 
+  // 3. Everything else from Jira's picker (recent/suggested).
   for (const iss of fromJira) {
     if (seen.has(iss.key)) continue;
     seen.add(iss.key);
-    out.push(iss);
+    out.push({
+      ...iss,
+      isFavorite: favoriteSet.has(iss.key),
+    });
   }
 
   return out;

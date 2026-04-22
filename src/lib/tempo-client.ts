@@ -47,6 +47,19 @@ export interface CreateWorklogParams {
   comment: string;
 }
 
+/**
+ * Returns the user's Tempo-favorite issue keys — the same list that
+ * powers the "Favorite" tab in Tempo's Log Time dialog.
+ * Endpoint: GET /rest/tempo-core/1/favorites/issue/
+ */
+export async function getTempoFavoriteIssueKeys(): Promise<string[]> {
+  const res = await jiraFetch('/rest/tempo-core/1/favorites/issue/');
+  if (!res.ok) return [];
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.filter((v): v is string => typeof v === 'string');
+}
+
 export async function createWorklog(
   params: CreateWorklogParams,
 ): Promise<TempoWorklog> {

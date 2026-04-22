@@ -151,6 +151,10 @@ These were agreed with the user; don't relitigate unless they ask:
   the user's recent issues but often without summaries when there's no
   query. `fetchIssueSummaries()` does a single JQL batch search to fill
   them in. Don't call `getIssue` per item — it'd be N+1.
+- **Tempo favorites endpoint:** `GET /rest/tempo-core/1/favorites/issue/`
+  returns a flat array of issue key strings — these are the Jiras shown
+  under the "Favorite" tab in Tempo's Log Time dialog. In the picker
+  UI, favorites get a ⭐ and always sort to the top.
 - **No `secid` needed for calendar.** Don't try to scrape it from the
   page HTML — the literal string isn't there anyway.
 - **All-day events** (Latvian name-days from `Apsveicam.lv` in
