@@ -249,16 +249,26 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     }
 
     const issueKey = match.mapping.jiraKey;
-    const description =
-      match.mapping.description ??
-      fillTemplate(templates.meeting, { title: ev.title, issue: issueKey });
+    const hasCustomDescription =
+      typeof match.mapping.description === 'string' &&
+      match.mapping.description.length > 0;
+
+    // When the user sets a per-mapping description we respect it verbatim —
+    // no template, no [auto] prefix, no [#sig:…] tag. Dedupe falls back to
+    // exact-comment matching for these (see orchestrator.computeAlreadyLogged).
+    const comment = hasCustomDescription
+      ? match.mapping.description!
+      : appendSignature(
+          fillTemplate(templates.meeting, { title: ev.title, issue: issueKey }),
+          `meeting-${ev.id}`,
+        );
 
     entries.push({
       id: `meeting:${ev.id}`,
       date: localDate(ev.startMs, input.timeZone),
       issueKey,
       minutes: ev.durationMinutes,
-      comment: appendSignature(description, `meeting-${ev.id}`),
+      comment,
       source: 'meeting',
       include: true,
       sourceInfo: {

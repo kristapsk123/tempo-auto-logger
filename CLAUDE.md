@@ -140,6 +140,13 @@ These were agreed with the user; don't relitigate unless they ask:
   stable marker, or (legacy fallback) the stripped comment matches.
 - **Comment format:** `[auto] {human text} [#sig:<type>-<id>]`. The sig
   tag is auto-appended; templates control the human text part.
+  **Exception:** when a meeting mapping has a custom `description`
+  field, that description is used verbatim — no template, no `[auto]`
+  prefix, no `[#sig:…]` tag — because users want their custom text to
+  appear exactly as they wrote it in Tempo. Dedupe falls back to
+  exact-comment matching (after stripping any sig tag) for those
+  entries; `computeAlreadyLogged` no longer requires worklog comments
+  to start with `[auto]`.
 - **Distribution:** unpacked extension from this git repo. `npm run
   build`, load `dist/` at `chrome://extensions`.
 

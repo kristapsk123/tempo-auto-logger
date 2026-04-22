@@ -35,7 +35,6 @@ import {
   getUserMeetingMappings,
   getUserTemplates,
 } from './storage';
-import { AUTO_COMMENT_PREFIX } from './config';
 import teamDefaults from '../../team-defaults.json';
 import githubOrgsConfig from '../../github-orgs.json';
 
@@ -270,14 +269,17 @@ function computeAlreadyLogged(
     const humanOnly = stripSignature(e.comment);
     for (const w of existing) {
       if (!w.issue || typeof w.comment !== 'string') continue;
-      if (!w.comment.startsWith(AUTO_COMMENT_PREFIX)) continue;
       if (w.issue.key !== e.issueKey) continue;
       const wDate = typeof w.started === 'string' ? w.started.slice(0, 10) : '';
       if (wDate !== e.date) continue;
+      // 1. New format: sig marker present in existing comment.
       if (w.comment.includes(sigMarker)) {
         already.add(e.id);
         break;
       }
+      // 2. Exact-match after stripping any sig — covers both legacy
+      // [auto]-prefixed entries and custom-description mappings where we
+      // deliberately don't attach a sig.
       if (stripSignature(w.comment) === humanOnly) {
         already.add(e.id);
         break;
