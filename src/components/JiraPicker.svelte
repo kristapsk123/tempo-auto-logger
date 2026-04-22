@@ -26,6 +26,50 @@
   );
 
   let showDropdown = $state(false);
+  let inputEl: HTMLInputElement | undefined = $state();
+  let dropdownPos = $state<{
+    top: number;
+    left: number;
+    width: number;
+    openUp: boolean;
+  } | null>(null);
+  const DROPDOWN_MAX_H = 224; // matches max-h-56 below (56 * 4px)
+
+  function computePos() {
+    if (!inputEl) return;
+    const rect = inputEl.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp =
+      spaceBelow < DROPDOWN_MAX_H && rect.top > spaceBelow;
+    dropdownPos = {
+      top: openUp ? rect.top : rect.bottom,
+      left: rect.left,
+      width: rect.width,
+      openUp,
+    };
+  }
+
+  function openDropdown() {
+    computePos();
+    showDropdown = true;
+  }
+
+  function closeDropdown() {
+    // Delay so click on a dropdown item registers before dropdown closes
+    setTimeout(() => (showDropdown = false), 150);
+  }
+
+  // Reposition on any scroll (the popup has an overflow-auto list) or resize.
+  $effect(() => {
+    if (!showDropdown) return;
+    const onScroll = () => computePos();
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  });
 
   let filtered = $derived.by(() => {
     const q = value.trim().toLowerCase();
@@ -52,23 +96,28 @@
   }
 </script>
 
-<div class="relative">
+<div>
   <input
+    bind:this={inputEl}
     type="text"
     bind:value
     {disabled}
-    oninput={() => onchange?.(value)}
-    onfocus={() => (showDropdown = true)}
-    onblur={() => {
-      // Delay so click on a dropdown item registers before dropdown closes
-      setTimeout(() => (showDropdown = false), 150);
+    oninput={() => {
+      onchange?.(value);
+      if (showDropdown) computePos();
     }}
+    onfocus={openDropdown}
+    onblur={closeDropdown}
     {placeholder}
     class="{baseInputClass} border-gray-300 disabled:bg-gray-100 disabled:text-gray-400 {inputClass}"
   />
-  {#if showDropdown && !disabled && filtered.length > 0}
+  {#if showDropdown && !disabled && filtered.length > 0 && dropdownPos}
     <div
-      class="absolute top-full left-0 z-20 bg-white border border-gray-300 shadow-lg rounded-b max-h-56 overflow-auto mt-0.5 min-w-full w-[22rem] max-w-[24rem]"
+      class="fixed z-50 bg-white border border-gray-300 shadow-lg rounded max-h-56 overflow-auto w-[22rem] max-w-[24rem]"
+      style:top="{dropdownPos.openUp ? 'auto' : dropdownPos.top + 2 + 'px'}"
+      style:bottom="{dropdownPos.openUp ? window.innerHeight - dropdownPos.top + 2 + 'px' : 'auto'}"
+      style:left="{dropdownPos.left}px"
+      style:min-width="{dropdownPos.width}px"
     >
       {#each filtered as fav (fav.key)}
         <button

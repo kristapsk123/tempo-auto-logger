@@ -13,7 +13,7 @@ export interface WorklogEntry {
   issueKey: string | null;
   minutes: number;
   comment: string;
-  source: 'commit' | 'review' | 'meeting';
+  source: 'commit' | 'review' | 'meeting' | 'manual';
   include: boolean;
   sourceInfo: {
     commitCount?: number;
@@ -139,6 +139,16 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     input.userDescriptionTemplates,
   );
 
+  // When the user has overridden a template in Settings → Templates, we treat
+  // that text as verbatim and skip the [#sig:…] tag — same rule meeting
+  // custom-descriptions already follow. Dedupe falls back to exact-comment
+  // matching (see computeAlreadyLogged).
+  const isCustomTemplate = {
+    commit: typeof input.userDescriptionTemplates?.commit === 'string',
+    review: typeof input.userDescriptionTemplates?.review === 'string',
+    meeting: typeof input.userDescriptionTemplates?.meeting === 'string',
+  };
+
   const entries: WorklogEntry[] = [];
   const unmappedMeetings: CalendarEvent[] = [];
   let skippedByAttendance = 0;
@@ -159,15 +169,15 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     }
   }
   for (const { date, issueKey, count } of commitGroups.values()) {
+    const filled = fillTemplate(templates.commit, { issue: issueKey });
     entries.push({
       id: `commit:${date}:${issueKey}`,
       date,
       issueKey,
       minutes: input.teamDefaults.defaultMinutes.commitPerIssuePerDay,
-      comment: appendSignature(
-        fillTemplate(templates.commit, { issue: issueKey }),
-        `commit-${issueKey}`,
-      ),
+      comment: isCustomTemplate.commit
+        ? filled
+        : appendSignature(filled, `commit-${issueKey}`),
       source: 'commit',
       include: true,
       sourceInfo: { commitCount: count },
@@ -197,19 +207,19 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     }
   }
   for (const g of reviewGroups.values()) {
+    const filled = fillTemplate(templates.review, {
+      issue: g.jiraKey,
+      prNum: g.prNumber,
+      prTitle: g.prTitle,
+    });
     entries.push({
       id: `review:${g.date}:${g.repo}#${g.prNumber}`,
       date: g.date,
       issueKey: g.jiraKey,
       minutes: input.teamDefaults.defaultMinutes.reviewPerPrPerDay,
-      comment: appendSignature(
-        fillTemplate(templates.review, {
-          issue: g.jiraKey,
-          prNum: g.prNumber,
-          prTitle: g.prTitle,
-        }),
-        `review-pr${g.prNumber}`,
-      ),
+      comment: isCustomTemplate.review
+        ? filled
+        : appendSignature(filled, `review-pr${g.prNumber}`),
       source: 'review',
       include: true,
       sourceInfo: {
@@ -254,14 +264,19 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
       match.mapping.description.length > 0;
 
     // When the user sets a per-mapping description we respect it verbatim —
-    // no template, no [auto] prefix, no [#sig:…] tag. Dedupe falls back to
-    // exact-comment matching for these (see orchestrator.computeAlreadyLogged).
+    // no template, no [auto] prefix, no [#sig:…] tag. Same rule applies when
+    // the meeting template itself has been overridden in Settings → Templates.
+    // Dedupe falls back to exact-comment matching for these (see
+    // orchestrator.computeAlreadyLogged).
+    const filledMeeting = fillTemplate(templates.meeting, {
+      title: ev.title,
+      issue: issueKey,
+    });
     const comment = hasCustomDescription
       ? match.mapping.description!
-      : appendSignature(
-          fillTemplate(templates.meeting, { title: ev.title, issue: issueKey }),
-          `meeting-${ev.id}`,
-        );
+      : isCustomTemplate.meeting
+        ? filledMeeting
+        : appendSignature(filledMeeting, `meeting-${ev.id}`);
 
     entries.push({
       id: `meeting:${ev.id}`,
@@ -281,7 +296,7 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
 
   entries.sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
-    const order = { meeting: 0, review: 1, commit: 2 } as const;
+    const order = { meeting: 0, review: 1, commit: 2, manual: 3 } as const;
     if (order[a.source] !== order[b.source]) {
       return order[a.source] - order[b.source];
     }

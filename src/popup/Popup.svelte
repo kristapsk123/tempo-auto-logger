@@ -116,12 +116,18 @@
   }
 
   function rebuildRows(p: LoadedPreview) {
-    rows = p.entries.map((e) => ({
-      entry: e,
-      include: !p.alreadyLoggedIds.has(e.id),
-      alreadyLogged: p.alreadyLoggedIds.has(e.id),
-      postStatus: 'idle' as const,
-    }));
+    // Manual rows live only in the popup's rows state — preserve them across
+    // re-aggregations (e.g. after saving an unmapped meeting mapping).
+    const manual = rows.filter((r) => r.entry.source === 'manual');
+    rows = [
+      ...p.entries.map((e) => ({
+        entry: e,
+        include: !p.alreadyLoggedIds.has(e.id),
+        alreadyLogged: p.alreadyLoggedIds.has(e.id),
+        postStatus: 'idle' as const,
+      })),
+      ...manual,
+    ];
     unmapped = p.unmapped.map((ev) => ({
       event: ev,
       jiraInput: '',
@@ -129,6 +135,33 @@
       skipInput: false,
       saving: false,
     }));
+  }
+
+  function addManualRow() {
+    if (!preview) return;
+    const id = `manual:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    rows = [
+      ...rows,
+      {
+        entry: {
+          id,
+          date: preview.dateFrom,
+          issueKey: '',
+          minutes: 30,
+          comment: '',
+          source: 'manual',
+          include: true,
+          sourceInfo: {},
+        },
+        include: true,
+        alreadyLogged: false,
+        postStatus: 'idle',
+      },
+    ];
+  }
+
+  function removeManualRow(id: string) {
+    rows = rows.filter((r) => r.entry.id !== id);
   }
 
   async function load(dateFrom: string, dateTo: string) {
@@ -243,12 +276,14 @@
   function sourceIcon(source: WorklogEntry['source']): string {
     if (source === 'commit') return '⎇';
     if (source === 'review') return '👁';
+    if (source === 'manual') return '✎';
     return '📅';
   }
 
   function sourceColor(source: WorklogEntry['source']): string {
     if (source === 'commit') return 'text-orange-600';
     if (source === 'review') return 'text-purple-600';
+    if (source === 'manual') return 'text-indigo-600';
     return 'text-emerald-600';
   }
 
@@ -260,11 +295,24 @@
     return 'bg-white border-gray-200';
   }
 
-  let toPostCount = $derived(
+  let toPostRows = $derived(
     rows.filter(
       (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok',
-    ).length,
+    ),
   );
+  let toPostCount = $derived(toPostRows.length);
+  let toPostMinutes = $derived(
+    toPostRows.reduce((sum, r) => sum + (r.entry.minutes || 0), 0),
+  );
+
+  function formatDuration(minutes: number): string {
+    if (minutes <= 0) return '0m';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+  }
 </script>
 
 <main class="p-4 w-[32rem] min-h-[360px] font-sans bg-gray-50">
@@ -391,6 +439,13 @@
             No commits, reviews or mapped meetings in this date range
           </div>
         {/if}
+        <button
+          class="w-full px-2 py-1 border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded text-xs"
+          onclick={addManualRow}
+          disabled={posting}
+        >
+          + Add manual entry
+        </button>
         {#each rows as r (r.entry.id)}
           <div class="flex items-center gap-2 px-2 py-1.5 border rounded text-xs {rowBg(r)}">
             <input
@@ -399,26 +454,74 @@
               bind:checked={r.include}
               disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
             />
-            <span class="shrink-0 {sourceColor(r.entry.source)}" title={r.entry.source}>
+            <span class="shrink-0 w-4 text-center {sourceColor(r.entry.source)}" title={r.entry.source}>
               {sourceIcon(r.entry.source)}
             </span>
-            <span class="shrink-0 text-gray-500 w-20 font-mono">{r.entry.date}</span>
-            <span class="shrink-0 text-blue-600 w-24 font-mono font-medium">
-              {r.entry.issueKey ?? '—'}
-            </span>
-            <span class="shrink-0 text-amber-700 w-10 text-right font-mono">{r.entry.minutes}m</span>
-            <span class="flex-1 min-w-0 text-gray-700 truncate" title={r.entry.comment}>
-              {r.entry.comment}
-            </span>
+            {#if r.entry.source === 'manual'}
+              <input
+                type="date"
+                class="shrink-0 w-28 px-1 py-0.5 border border-gray-300 rounded font-mono text-gray-700 bg-white disabled:bg-gray-50"
+                bind:value={r.entry.date}
+                disabled={posting || r.postStatus === 'ok'}
+                title="Date"
+              />
+              <div class="shrink-0 w-24">
+                <JiraPicker
+                  value={r.entry.issueKey ?? ''}
+                  onchange={(v) => {
+                    r.entry.issueKey = v;
+                  }}
+                  favorites={preview?.favorites ?? []}
+                  disabled={posting || r.postStatus === 'ok'}
+                />
+              </div>
+            {:else}
+              <span class="shrink-0 text-gray-500 w-20 font-mono">{r.entry.date}</span>
+              <span class="shrink-0 text-blue-600 w-24 font-mono font-medium">
+                {r.entry.issueKey ?? '—'}
+              </span>
+            {/if}
+            <input
+              type="number"
+              min="1"
+              step="5"
+              class="shrink-0 w-14 px-1 py-0.5 border border-gray-300 rounded text-right font-mono text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500"
+              bind:value={r.entry.minutes}
+              disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
+              title="Minutes"
+            />
+            {#if r.entry.source === 'manual'}
+              <input
+                type="text"
+                placeholder="description"
+                class="flex-1 min-w-0 px-1.5 py-0.5 border border-gray-300 rounded text-gray-700 bg-white disabled:bg-gray-50"
+                bind:value={r.entry.comment}
+                disabled={posting || r.postStatus === 'ok'}
+              />
+            {:else}
+              <span class="flex-1 min-w-0 text-gray-700 truncate" title={r.entry.comment}>
+                {r.entry.comment}
+              </span>
+            {/if}
             <span class="shrink-0 w-4 text-right">
-              {#if r.alreadyLogged}
-                <span class="text-gray-500" title="Already logged in Tempo">⊘</span>
-              {:else if r.postStatus === 'posting'}
+              {#if r.postStatus === 'posting'}
                 <span class="text-blue-600">…</span>
               {:else if r.postStatus === 'ok'}
                 <span class="text-green-600">✓</span>
               {:else if r.postStatus === 'fail'}
                 <span class="text-red-600" title={r.postError}>✗</span>
+              {:else if r.alreadyLogged}
+                <span class="text-gray-500" title="Already logged in Tempo">⊘</span>
+              {:else if r.entry.source === 'manual'}
+                <button
+                  class="text-red-600 hover:bg-red-50 rounded"
+                  onclick={() => removeManualRow(r.entry.id)}
+                  disabled={posting}
+                  title="Remove manual entry"
+                  aria-label="Remove"
+                >
+                  ✗
+                </button>
               {/if}
             </span>
           </div>
@@ -498,7 +601,7 @@
         {:else}
           <div class="text-xs text-gray-500">
             {#if toPostCount > 0}
-              Ready to post {toPostCount} entries
+              Ready to post {toPostCount} entries · <span class="font-medium text-gray-700">{formatDuration(toPostMinutes)}</span>
             {:else}
               Nothing to post — check entries above
             {/if}
@@ -515,3 +618,16 @@
     </div>
   {/if}
 </main>
+
+<style>
+  /* Hide spinner arrows on minute inputs — they waste space in the tight row layout. */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+</style>

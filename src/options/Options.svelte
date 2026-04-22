@@ -556,7 +556,9 @@
             <code>{'{issue}'}</code>, <code>{'{prNum}'}</code>,
             <code>{'{prTitle}'}</code>, <code>{'{title}'}</code> (meeting title).
             Your edits are saved locally and override the team defaults.
-            A <code>[#sig:…]</code> tag is auto-appended for dedupe.
+            When you override a template, the comment is used verbatim —
+            no <code>[#sig:…]</code> tag is appended (dedupe falls back to
+            exact-comment match). Team defaults still get the tag.
           </p>
 
           <div class="space-y-4">
