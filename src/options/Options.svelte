@@ -454,9 +454,11 @@
         {:else if active === 'github'}
           <h2 class="text-lg font-medium text-gray-900 mb-2">GitHub</h2>
           <p class="text-xs text-gray-600 mb-4">
-            A personal access token is needed to read your commits and
-            submitted PR reviews. Stored in <code>chrome.storage.local</code>
-            on this device only.
+            <strong>Optional.</strong> Add a personal access token if
+            you want the extension to read your commits and submitted
+            PR reviews. Leave it blank to run in <em>meetings-only
+            mode</em> (only calendar meetings get logged). Stored in
+            <code>chrome.storage.local</code> on this device only.
           </p>
 
           <div class="space-y-3">

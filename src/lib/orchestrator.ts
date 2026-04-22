@@ -84,11 +84,11 @@ export async function loadPreview(
       'Your Jira profile has no email — cannot match calendar events',
     );
   }
+  // Meetings-only mode: when no GitHub PAT is saved, skip commits/reviews
+  // entirely and log only calendar meetings. Intended for users with no
+  // GitHub activity (managers, QA, etc.) who shouldn't have to create a
+  // token just to use the extension.
   const token = await getGithubToken();
-  if (!token) {
-    throw new Error('No GitHub PAT saved — paste one in the field above first');
-  }
-  const user = await getGithubUser(token);
   const [userMappings, attendanceFilter, userTemplates] = await Promise.all([
     getUserMeetingMappings(),
     getAttendanceFilter(),
@@ -98,10 +98,23 @@ export async function loadPreview(
   const timeZone =
     Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Europe/Riga';
 
-  const [commits, reviews, events, existing, jiraRecent, tempoFavoriteKeys] =
+  const githubPromise = token
+    ? (async () => {
+        const user = await getGithubUser(token);
+        const [c, r] = await Promise.all([
+          searchMyCommits({ token, username: user.login, orgs, dateFrom, dateTo }),
+          listMyReviews({ token, username: user.login, orgs, dateFrom, dateTo }),
+        ]);
+        return { commits: c, reviews: r };
+      })()
+    : Promise.resolve({
+        commits: [] as CommitActivity[],
+        reviews: [] as ReviewActivity[],
+      });
+
+  const [github, events, existing, jiraRecent, tempoFavoriteKeys] =
     await Promise.all([
-      searchMyCommits({ token, username: user.login, orgs, dateFrom, dateTo }),
-      listMyReviews({ token, username: user.login, orgs, dateFrom, dateTo }),
+      githubPromise,
       listCalendarEvents({
         userEmail: me.emailAddress,
         dateFrom,
@@ -114,6 +127,7 @@ export async function loadPreview(
       searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
       getTempoFavoriteIssueKeys().catch(() => [] as string[]),
     ]);
+  const { commits, reviews } = github;
 
   const favorites = mergeFavorites(
     jiraRecent,

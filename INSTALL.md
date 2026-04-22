@@ -7,9 +7,11 @@ extension. You don't need to know git, npm, or anything technical.
 
 - Google Chrome (or any Chromium-based browser: Edge, Brave, etc.)
 - About 5 minutes
-- A GitHub account with access to the Visma repos you care about
 - You already log in to Jira (`jira.visma.com`) and Google Calendar in
   this browser
+- **Optional:** a GitHub account with access to the Visma repos you
+  care about — only needed if you want to log commits and PR reviews.
+  If you only want to log calendar meetings, skip this.
 
 ---
 
@@ -46,7 +48,12 @@ Save it somewhere you won't accidentally delete — for example:
 
 ---
 
-## Step 3 — Create a GitHub token
+## Step 3 — Create a GitHub token *(optional)*
+
+> ⏭️ **Skip this step** if you only want to log calendar meetings (no
+> commits or PR reviews). The extension runs fine without a token —
+> you'll see a small blue banner saying *"Meetings-only mode"* at the
+> top of the popup. Jump straight to Step 5.
 
 The extension needs a small token to read **your own** commits and PR
 reviews from GitHub. It can only read — it cannot write, push, or delete.
@@ -63,7 +70,9 @@ reviews from GitHub. It can only read — it cannot write, push, or delete.
 
 ---
 
-## Step 4 — Paste the token into the extension
+## Step 4 — Paste the token into the extension *(optional)*
+
+> ⏭️ Also skip this if you skipped Step 3.
 
 1. Click the Tempo Auto Logger icon in Chrome → a popup appears.
 2. Click **Settings** (top-right of the popup).

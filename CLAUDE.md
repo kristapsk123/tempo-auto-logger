@@ -42,7 +42,13 @@ token dance.
   stable for the purpose. **No `secid` XSRF param needed** — cookies
   alone authenticate it (verified 2026-04-21).
 - **GitHub:** uses a normal personal access token (no SSO-like problem
-  on github.com). Stored in `chrome.storage.local`.
+  on github.com). Stored in `chrome.storage.local`. **Optional.** When
+  no token is saved, the extension runs in **meetings-only mode** —
+  `orchestrator.loadPreview` skips `searchMyCommits` / `listMyReviews`
+  and only processes calendar events. The popup shows a small blue
+  "Meetings-only mode" banner above the date range. Added so
+  non-developers (managers, QA) can use the extension without needing
+  a GitHub account.
 
 ## Environment-specific facts
 

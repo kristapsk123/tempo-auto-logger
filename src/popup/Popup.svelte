@@ -345,21 +345,21 @@
     </button>
   </header>
 
-  {#if hasPat === false}
-    <div class="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
-      <div class="font-medium mb-1">No GitHub PAT saved</div>
-      <div class="mb-2">
-        A GitHub personal access token is required to read your commits
-        and PR reviews. Add it in Settings.
+  {#if hasPat !== null}
+    {#if hasPat === false}
+      <div class="mb-2 px-2.5 py-1.5 bg-sky-50 border border-sky-200 rounded text-[11px] text-sky-900 flex items-center justify-between gap-2">
+        <span>
+          <span class="font-medium">Meetings-only mode.</span>
+          Add a GitHub token in Settings to also log commits and PR reviews.
+        </span>
+        <button
+          class="shrink-0 text-sky-700 hover:underline"
+          onclick={() => chrome.runtime.openOptionsPage()}
+        >
+          Settings
+        </button>
       </div>
-      <button
-        class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded"
-        onclick={() => chrome.runtime.openOptionsPage()}
-      >
-        Open Settings
-      </button>
-    </div>
-  {:else if hasPat === true}
+    {/if}
     <div class="space-y-2">
       <div class="flex flex-wrap gap-1.5">
         {#each [
