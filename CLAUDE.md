@@ -48,9 +48,15 @@ token dance.
 
 Jira: `https://jira.visma.com` — **Atlassian Jira Data Center
 v9.12.14**, NOT Jira Cloud. Use `/rest/api/2/...` and
-`/rest/tempo-timesheets/4/...` endpoints. Username for Tempo `worker`
-field is the `name` field returned by `/rest/api/2/myself` (e.g.
-`kristaps.krauze`). Project key: `NUMO-`.
+`/rest/tempo-timesheets/4/...` endpoints. Tempo's `worker` field
+accepts either the Jira `name` (e.g. `kristaps.krauze`) or the
+`key` (e.g. `JIRAUSER132909`) returned by `/rest/api/2/myself` —
+which one actually works depends on how the user's account was
+migrated. `postEntries` tries `name` first; on a 400 with
+`"worker":"User is invalid"` it automatically retries and sticks
+with `key` for the rest of the batch. `listWorklogs` is called
+with both identifiers so dedupe covers worklogs posted under
+either one. Project key: `NUMO-`.
 
 Tempo create-worklog payload needs `originTaskId` (numeric Jira issue
 id), not the key. Resolve via `GET /rest/api/2/issue/{KEY}?fields=summary`

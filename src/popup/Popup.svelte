@@ -260,7 +260,7 @@
         minutes: r.entry.minutes,
         comment: r.entry.comment,
       })),
-      preview.jiraUsername,
+      preview.jiraWorker,
       (result) => {
         const row = rows.find((x) => x.entry.id === result.id);
         if (!row) return;

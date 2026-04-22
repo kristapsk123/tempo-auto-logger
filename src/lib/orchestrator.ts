@@ -55,7 +55,11 @@ export interface LoadedPreview {
   skippedByMapping: number;
   existingWorklogs: TempoWorklog[];
   alreadyLoggedIds: Set<string>;
-  jiraUsername: string;
+  // Tempo's `worker` field sometimes wants the Jira username (e.g.
+  // "karlis.birznieks"), sometimes the user key (e.g. "JIRAUSER132909") —
+  // it depends on how the account was migrated. We keep both so postEntries
+  // can try one and fall back to the other.
+  jiraWorker: { name: string; key: string };
   favorites: JiraIssueOption[];
   cachedFetch: CachedFetch;
 }
@@ -103,7 +107,9 @@ export async function loadPreview(
         dateFrom,
         dateTo,
       }),
-      listWorklogs({ usernames: [me.name], dateFrom, dateTo }),
+      // Pass both identifiers so dedupe covers worklogs posted under
+      // either one.
+      listWorklogs({ usernames: [me.name, me.key], dateFrom, dateTo }),
       // Both favorites lookups are non-critical; fall back to empty
       searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
       getTempoFavoriteIssueKeys().catch(() => [] as string[]),
@@ -141,7 +147,7 @@ export async function loadPreview(
     skippedByMapping: aggregated.skippedByMapping,
     existingWorklogs: existing,
     alreadyLoggedIds,
-    jiraUsername: me.name,
+    jiraWorker: { name: me.name, key: me.key },
     favorites,
     cachedFetch: { commits, reviews, events, timeZone },
   };
@@ -303,30 +309,63 @@ export interface PostResult {
   error?: string;
 }
 
+function isWorkerInvalidError(msg: string): boolean {
+  // Tempo returns: 400 {"errors":{"worker":"User is invalid"},...}
+  return /"worker"\s*:\s*"[^"]*invalid/i.test(msg);
+}
+
 export async function postEntries(
   entries: PostItem[],
-  jiraUsername: string,
+  jiraWorker: { name: string; key: string },
   onProgress: (result: PostResult) => void,
 ): Promise<PostResult[]> {
   const results: PostResult[] = [];
+  // Start with the username. If Tempo rejects it as invalid, switch to the
+  // user key (e.g. JIRAUSER132909) for the rest of the batch.
+  let currentWorker = jiraWorker.name;
+  let triedFallback = false;
+
   for (const e of entries) {
-    try {
-      await createWorklog({
+    const attempt = async (worker: string) =>
+      createWorklog({
         issueKey: e.issueKey,
-        worker: jiraUsername,
+        worker,
         started: e.date,
         timeSpentSeconds: e.minutes * 60,
         comment: e.comment,
       });
+
+    try {
+      await attempt(currentWorker);
       const r: PostResult = { id: e.id, status: 'ok' };
       results.push(r);
       onProgress(r);
     } catch (err) {
-      const r: PostResult = {
-        id: e.id,
-        status: 'fail',
-        error: err instanceof Error ? err.message : String(err),
-      };
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        !triedFallback &&
+        currentWorker === jiraWorker.name &&
+        jiraWorker.key &&
+        jiraWorker.key !== jiraWorker.name &&
+        isWorkerInvalidError(msg)
+      ) {
+        triedFallback = true;
+        currentWorker = jiraWorker.key;
+        try {
+          await attempt(currentWorker);
+          const r: PostResult = { id: e.id, status: 'ok' };
+          results.push(r);
+          onProgress(r);
+          continue;
+        } catch (err2) {
+          const msg2 = err2 instanceof Error ? err2.message : String(err2);
+          const r: PostResult = { id: e.id, status: 'fail', error: msg2 };
+          results.push(r);
+          onProgress(r);
+          continue;
+        }
+      }
+      const r: PostResult = { id: e.id, status: 'fail', error: msg };
       results.push(r);
       onProgress(r);
     }
