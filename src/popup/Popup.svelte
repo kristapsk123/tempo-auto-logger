@@ -9,7 +9,6 @@
   import {
     addUserMeetingMapping,
     getGithubToken,
-    setGithubToken,
   } from '../lib/storage';
   import type { WorklogEntry } from '../lib/aggregator';
   import type { CalendarEvent } from '../lib/calendar-client';
@@ -32,8 +31,9 @@
     saving: boolean;
   };
 
-  let patInput = $state('');
-  let patStatus = $state<'unset' | 'saved'>('unset');
+  let hasPat = $state<boolean | null>(null); // null = loading
+  let dateFrom = $state(isoDate(-1));
+  let dateTo = $state(isoDate(-1));
 
   let loading = $state(false);
   let loadError = $state<string | null>(null);
@@ -51,10 +51,7 @@
   $effect(() => {
     void (async () => {
       const t = await getGithubToken();
-      if (t) {
-        patInput = t;
-        patStatus = 'saved';
-      }
+      hasPat = !!t;
     })();
   });
 
@@ -64,10 +61,50 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  async function savePat() {
-    await setGithubToken(patInput.trim());
-    patStatus = 'saved';
+  function presetYesterday() {
+    const d = isoDate(-1);
+    dateFrom = d;
+    dateTo = d;
   }
+
+  function presetToday() {
+    const d = isoDate(0);
+    dateFrom = d;
+    dateTo = d;
+  }
+
+  function presetLast7() {
+    dateFrom = isoDate(-7);
+    dateTo = isoDate(-1);
+  }
+
+  function presetThisWeek() {
+    const now = new Date();
+    const dow = now.getDay(); // 0=Sun, 1=Mon, ...
+    const daysBack = dow === 0 ? 6 : dow - 1;
+    dateFrom = isoDate(-daysBack);
+    dateTo = isoDate(0);
+  }
+
+  function presetLastWeek() {
+    const now = new Date();
+    const dow = now.getDay();
+    const daysBackToMonday = dow === 0 ? 6 : dow - 1;
+    dateFrom = isoDate(-daysBackToMonday - 7);
+    dateTo = isoDate(-daysBackToMonday - 1);
+  }
+
+  let rangeError = $derived.by(() => {
+    if (!dateFrom || !dateTo) return 'Pick a date range';
+    if (dateFrom > dateTo) return 'From must be on or before To';
+    const days =
+      (new Date(dateTo + 'T00:00:00').getTime() -
+        new Date(dateFrom + 'T00:00:00').getTime()) /
+        86400000 +
+      1;
+    if (days > 30) return 'Range is capped at 30 days';
+    return null;
+  });
 
   function deriveMatchSuggestion(title: string): string {
     return title
@@ -246,37 +283,72 @@
     </button>
   </header>
 
-  <div class="flex gap-2 mb-3">
-    <input
-      type="password"
-      placeholder="GitHub PAT"
-      bind:value={patInput}
-      class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs font-mono bg-white"
-    />
-    <button
-      class="px-3 py-1.5 bg-gray-700 hover:bg-gray-800 text-white text-xs rounded"
-      onclick={savePat}
-    >
-      {patStatus === 'saved' ? 'Saved ✓' : 'Save'}
-    </button>
-  </div>
+  {#if hasPat === false}
+    <div class="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
+      <div class="font-medium mb-1">No GitHub PAT saved</div>
+      <div class="mb-2">
+        A GitHub personal access token is required to read your commits
+        and PR reviews. Add it in Settings.
+      </div>
+      <button
+        class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded"
+        onclick={() => chrome.runtime.openOptionsPage()}
+      >
+        Open Settings
+      </button>
+    </div>
+  {:else if hasPat === true}
+    <div class="space-y-2">
+      <div class="flex flex-wrap gap-1.5">
+        {#each [
+          { label: 'Yesterday', action: presetYesterday },
+          { label: 'Today', action: presetToday },
+          { label: 'Last 7 days', action: presetLast7 },
+          { label: 'This week', action: presetThisWeek },
+          { label: 'Last week', action: presetLastWeek },
+        ] as preset (preset.label)}
+          <button
+            class="px-2.5 py-1 border border-gray-300 hover:bg-gray-100 bg-white text-xs rounded"
+            disabled={loading || posting}
+            onclick={preset.action}
+          >
+            {preset.label}
+          </button>
+        {/each}
+      </div>
 
-  <div class="flex gap-2">
-    <button
-      class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
-      disabled={loading || posting}
-      onclick={() => load(isoDate(-1), isoDate(-1))}
-    >
-      {loading ? 'Loading…' : 'Log yesterday'}
-    </button>
-    <button
-      class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
-      disabled={loading || posting}
-      onclick={() => load(isoDate(0), isoDate(0))}
-    >
-      Log today
-    </button>
-  </div>
+      <div class="flex items-center gap-2 text-xs text-gray-700">
+        <label class="flex items-center gap-1">
+          From
+          <input
+            type="date"
+            bind:value={dateFrom}
+            class="px-1.5 py-1 border border-gray-300 rounded bg-white"
+          />
+        </label>
+        <label class="flex items-center gap-1">
+          To
+          <input
+            type="date"
+            bind:value={dateTo}
+            class="px-1.5 py-1 border border-gray-300 rounded bg-white"
+          />
+        </label>
+      </div>
+
+      {#if rangeError}
+        <div class="text-xs text-red-700">{rangeError}</div>
+      {/if}
+
+      <button
+        class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+        disabled={loading || posting || rangeError !== null}
+        onclick={() => load(dateFrom, dateTo)}
+      >
+        {loading ? 'Loading…' : `Log ${dateFrom}${dateFrom !== dateTo ? ` → ${dateTo}` : ''}`}
+      </button>
+    </div>
+  {/if}
 
   {#if loadError}
     <div class="mt-3 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-800">
