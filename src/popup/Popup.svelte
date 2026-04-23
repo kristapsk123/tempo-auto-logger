@@ -337,12 +337,22 @@
         Log commits, reviews and meetings to Tempo
       </p>
     </div>
-    <button
-      class="text-xs text-blue-600 hover:underline"
-      onclick={() => chrome.runtime.openOptionsPage()}
-    >
-      Settings
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        class="text-xs text-blue-600 hover:underline"
+        onclick={() => chrome.runtime.openOptionsPage()}
+      >
+        Settings
+      </button>
+      <button
+        class="text-gray-400 hover:text-gray-700 text-base leading-none"
+        onclick={() => window.close()}
+        title="Close"
+        aria-label="Close"
+      >
+        ✕
+      </button>
+    </div>
   </header>
 
   {#if hasPat !== null}
