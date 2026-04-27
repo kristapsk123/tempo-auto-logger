@@ -99,3 +99,65 @@ export async function setUserTemplates(
   await chrome.storage.local.set({ [KEYS.USER_TEMPLATES]: templates });
 }
 
+// --- Session storage: popup state within a single browser session ---
+
+export type UnmappedInputCache = Record<
+  string,
+  { jiraInput: string; matchInput: string; skipInput: boolean }
+>;
+
+const SESSION_KEYS = {
+  POPUP_DATE_FROM: 'popupDateFrom',
+  POPUP_DATE_TO: 'popupDateTo',
+  UNMAPPED_INPUTS: 'unmappedInputs',
+} as const;
+
+export async function getSessionPopupDates(): Promise<{
+  dateFrom: string | null;
+  dateTo: string | null;
+}> {
+  const result = await chrome.storage.session.get([
+    SESSION_KEYS.POPUP_DATE_FROM,
+    SESSION_KEYS.POPUP_DATE_TO,
+  ]);
+  return {
+    dateFrom:
+      typeof result[SESSION_KEYS.POPUP_DATE_FROM] === 'string'
+        ? (result[SESSION_KEYS.POPUP_DATE_FROM] as string)
+        : null,
+    dateTo:
+      typeof result[SESSION_KEYS.POPUP_DATE_TO] === 'string'
+        ? (result[SESSION_KEYS.POPUP_DATE_TO] as string)
+        : null,
+  };
+}
+
+export async function setSessionPopupDates(
+  dateFrom: string,
+  dateTo: string,
+): Promise<void> {
+  await chrome.storage.session.set({
+    [SESSION_KEYS.POPUP_DATE_FROM]: dateFrom,
+    [SESSION_KEYS.POPUP_DATE_TO]: dateTo,
+  });
+}
+
+export async function getSessionUnmappedInputs(): Promise<UnmappedInputCache> {
+  const result = await chrome.storage.session.get(SESSION_KEYS.UNMAPPED_INPUTS);
+  const value = result[SESSION_KEYS.UNMAPPED_INPUTS];
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as UnmappedInputCache;
+  }
+  return {};
+}
+
+export async function setSessionUnmappedInputs(
+  inputs: UnmappedInputCache,
+): Promise<void> {
+  await chrome.storage.session.set({ [SESSION_KEYS.UNMAPPED_INPUTS]: inputs });
+}
+
+export async function clearSessionUnmappedInputs(): Promise<void> {
+  await chrome.storage.session.remove(SESSION_KEYS.UNMAPPED_INPUTS);
+}
+
