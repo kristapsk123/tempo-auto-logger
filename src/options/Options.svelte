@@ -634,6 +634,7 @@
               <li>Meetings → exact calendar duration, with Jira mapping by title substring</li>
               <li>Dedupe: existing Tempo entries with the same issue/date/comment are detected and skipped on re-run (legacy <code>[#sig:…]</code> tags still recognized)</li>
             </ul>
+            <p>The project was created by Ronda's minion.</p>
             <p class="pt-2 border-t border-gray-200">
               <a
                 href="https://github.com/kristapsk123/tempo-auto-logger"
