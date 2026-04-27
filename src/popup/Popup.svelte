@@ -390,7 +390,7 @@
   }
 </script>
 
-<main class="p-4 w-[32rem] min-h-[360px] font-sans bg-gray-50">
+<main class="p-4 w-full min-h-[360px] font-sans bg-gray-50">
   <header class="flex items-start justify-between mb-3">
     <div>
       <h1 class="text-lg font-semibold text-gray-900">Tempo Auto Logger</h1>
@@ -398,22 +398,12 @@
         Log commits, reviews and meetings to Tempo
       </p>
     </div>
-    <div class="flex items-center gap-2">
-      <button
-        class="text-xs text-blue-600 hover:underline"
-        onclick={() => chrome.runtime.openOptionsPage()}
-      >
-        Settings
-      </button>
-      <button
-        class="text-gray-400 hover:text-gray-700 text-base leading-none"
-        onclick={() => window.close()}
-        title="Close"
-        aria-label="Close"
-      >
-        ✕
-      </button>
-    </div>
+    <button
+      class="text-xs text-blue-600 hover:underline"
+      onclick={() => chrome.runtime.openOptionsPage()}
+    >
+      Settings
+    </button>
   </header>
 
   {#if hasPat !== null}
@@ -508,7 +498,7 @@
 
   {#if preview}
     <div class="mt-3 bg-white border border-gray-200 rounded shadow-sm">
-      <div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+      <div class="px-3 py-2 border-b border-gray-200 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <div class="text-xs text-gray-700">
           <span class="font-medium">{preview.dateFrom}</span>
           {#if preview.dateFrom !== preview.dateTo}
