@@ -5,6 +5,13 @@ import manifest from './src/manifest.config';
 
 export default defineConfig({
   plugins: [svelte(), crx({ manifest })],
+  build: {
+    rollupOptions: {
+      input: {
+        popup: 'src/popup/index.html',
+      },
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,
