@@ -149,6 +149,7 @@ export async function loadPreview(
     dateTo,
   });
 
+  await attachIssueTitles(aggregated.entries);
   const alreadyLoggedIds = computeAlreadyLogged(aggregated.entries, existing);
 
   return {
@@ -180,6 +181,17 @@ export async function loadFavorites(): Promise<JiraIssueOption[]> {
   );
   await fillMissingSummaries(merged);
   return merged;
+}
+
+async function attachIssueTitles(entries: WorklogEntry[]): Promise<void> {
+  const keys = [...new Set(entries.map((e) => e.issueKey).filter((k): k is string => !!k))];
+  if (keys.length === 0) return;
+  const summaries = await fetchIssueSummaries(keys).catch(() => new Map<string, string>());
+  for (const e of entries) {
+    if (e.issueKey && summaries.has(e.issueKey)) {
+      e.issueTitle = summaries.get(e.issueKey);
+    }
+  }
 }
 
 async function fillMissingSummaries(items: JiraIssueOption[]): Promise<void> {
@@ -267,6 +279,7 @@ export async function reaggregate(
     dateFrom,
     dateTo,
   });
+  await attachIssueTitles(aggregated.entries);
   return {
     entries: aggregated.entries,
     unmapped: aggregated.unmappedMeetings,
