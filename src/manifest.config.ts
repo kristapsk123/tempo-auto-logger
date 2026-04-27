@@ -8,7 +8,6 @@ export default defineManifest({
     'Auto-logs time to Jira Tempo from GitHub activity and Google Calendar meetings',
   version: pkg.version,
   action: {
-    default_popup: 'src/popup/index.html',
     default_title: 'Tempo Auto Logger',
   },
   options_page: 'src/options/index.html',
