@@ -9,6 +9,12 @@
   import {
     addUserMeetingMapping,
     getGithubToken,
+    getSessionPopupDates,
+    getSessionUnmappedInputs,
+    setSessionPopupDates,
+    setSessionUnmappedInputs,
+    clearSessionUnmappedInputs,
+    type UnmappedInputCache,
   } from '../lib/storage';
   import type { WorklogEntry } from '../lib/aggregator';
   import type { CalendarEvent } from '../lib/calendar-client';
@@ -38,6 +44,7 @@
   let hasPat = $state<boolean | null>(null); // null = loading
   let dateFrom = $state(isoDate(-1));
   let dateTo = $state(isoDate(-1));
+  let sessionUnmappedInputs = $state<UnmappedInputCache>({});
 
   let loading = $state(false);
   let loadError = $state<string | null>(null);
@@ -54,9 +61,36 @@
 
   $effect(() => {
     void (async () => {
-      const t = await getGithubToken();
+      const [t, savedDates, savedInputs] = await Promise.all([
+        getGithubToken(),
+        getSessionPopupDates().catch(() => ({ dateFrom: null, dateTo: null })),
+        getSessionUnmappedInputs().catch(() => ({} as UnmappedInputCache)),
+      ]);
       hasPat = !!t;
+      if (savedDates.dateFrom && savedDates.dateTo) {
+        dateFrom = savedDates.dateFrom;
+        dateTo = savedDates.dateTo;
+      }
+      sessionUnmappedInputs = savedInputs;
     })();
+  });
+
+  // Sync unmapped row inputs to session storage so they survive popup close.
+  // When all meetings are mapped (unmapped becomes empty), clear the cache.
+  $effect(() => {
+    if (unmapped.length === 0) {
+      if (preview !== null) void clearSessionUnmappedInputs().catch(() => {});
+      return;
+    }
+    const cache: UnmappedInputCache = {};
+    for (const u of unmapped) {
+      cache[u.event.id] = {
+        jiraInput: u.jiraInput,
+        matchInput: u.matchInput,
+        skipInput: u.skipInput,
+      };
+    }
+    void setSessionUnmappedInputs(cache).catch(() => {});
   });
 
   function isoDate(offsetDays: number): string {
@@ -134,13 +168,23 @@
       })),
       ...manual,
     ];
-    unmapped = p.unmapped.map((ev) => ({
-      event: ev,
-      jiraInput: '',
-      matchInput: deriveMatchSuggestion(ev.title),
-      skipInput: false,
-      saving: false,
-    }));
+    // Preserve any inputs the user has already typed: check in-memory state
+    // first (handles save-one-by-one reset), then session storage (handles
+    // popup close/reopen).
+    const currentInputs = new Map(unmapped.map((u) => [u.event.id, u]));
+    unmapped = p.unmapped.map((ev) => {
+      const cur = currentInputs.get(ev.id);
+      if (cur) return { ...cur, saving: false };
+      const ses = sessionUnmappedInputs[ev.id];
+      if (ses) return { event: ev, ...ses, saving: false };
+      return {
+        event: ev,
+        jiraInput: '',
+        matchInput: deriveMatchSuggestion(ev.title),
+        skipInput: false,
+        saving: false,
+      };
+    });
   }
 
   function addManualRow() {
@@ -190,6 +234,7 @@
     try {
       const result = await loadPreview(dateFrom, dateTo);
       preview = result;
+      void setSessionPopupDates(dateFrom, dateTo).catch(() => {});
       rebuildRows(result);
     } catch (e) {
       if (e instanceof SessionExpiredError) {
