@@ -235,6 +235,23 @@ After any meaningful change, ensure build + check pass, commit with a
 descriptive message (Co-Authored-By: Claude trailer per house style),
 push to `origin/master`.
 
+## Keeping this file current
+
+This file is the single source of truth for any AI session working on this
+repo. It must stay accurate — a stale CLAUDE.md is worse than none because
+it causes AI assistants to make wrong assumptions.
+
+**Rule:** whenever an issue or PR introduces a new behaviour, locked design
+decision, known quirk, or architectural change, update this file as part of
+the same commit/PR. Don't leave it for later.
+
+Concretely, update CLAUDE.md when you:
+- Lock a new design decision (add it under "Locked design decisions").
+- Discover a new gotcha or edge-case (add it under "Known quirks / gotchas").
+- Add, remove, or rename a source file that's listed in "File layout".
+- Change an endpoint, auth mechanism, or environment-specific fact.
+- Mark something in "Things deliberately NOT done yet" as done.
+
 ## Remote
 
 `https://github.com/kristapsk123/tempo-auto-logger` — private.
