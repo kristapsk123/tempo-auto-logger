@@ -110,6 +110,22 @@
     return null;
   });
 
+  let activePreset = $derived.by((): string | null => {
+    const yesterday = isoDate(-1);
+    const today = isoDate(0);
+    if (dateFrom === yesterday && dateTo === yesterday) return 'Yesterday';
+    if (dateFrom === today && dateTo === today) return 'Today';
+    if (dateFrom === isoDate(-7) && dateTo === yesterday) return 'Last 7 days';
+    const daysToMonday = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+    if (dateFrom === isoDate(-daysToMonday) && dateTo === today) return 'This week';
+    if (
+      dateFrom === isoDate(-daysToMonday - 7) &&
+      dateTo === isoDate(-daysToMonday - 1)
+    )
+      return 'Last week';
+    return null;
+  });
+
   function deriveMatchSuggestion(title: string): string {
     return title
       .replace(/[,].*$/, '')
@@ -380,7 +396,9 @@
           { label: 'Last week', action: presetLastWeek },
         ] as preset (preset.label)}
           <button
-            class="px-2.5 py-1 border border-gray-300 hover:bg-gray-100 bg-white text-xs rounded"
+            class="px-2.5 py-1 border text-xs rounded {activePreset === preset.label
+              ? 'border-blue-500 bg-blue-100 text-blue-800 font-medium'
+              : 'border-gray-300 hover:bg-gray-100 bg-white'}"
             disabled={loading || posting}
             onclick={preset.action}
           >
