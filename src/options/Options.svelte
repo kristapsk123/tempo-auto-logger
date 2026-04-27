@@ -172,7 +172,7 @@
     const normalized: MeetingMapping[] = userMappings.map((r) => ({
       match: r.match.trim(),
       jiraKey: r.skip ? '' : r.jiraKey.trim().toUpperCase(),
-      description: r.description.trim() || undefined,
+      description: r.description.trim(),
       skip: r.skip === true ? true : undefined,
     }));
     await replaceUserMeetingMappings(normalized);
@@ -342,8 +342,9 @@
           <p class="text-xs text-gray-600 mb-4">
             A meeting's title is matched against these "match" strings
             (case-insensitive substring). Longest match wins. Description
-            is optional — if blank, the meeting's actual calendar title is
-            used. Tick <strong>Skip</strong> to drop matching meetings
+            is optional — if blank, no description is posted to Tempo (use
+            <em>Settings → Templates</em> to default to the meeting title).
+            Tick <strong>Skip</strong> to drop matching meetings
             from the preview entirely (useful for "Out of office",
             holidays, etc.).
           </p>

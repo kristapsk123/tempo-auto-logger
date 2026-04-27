@@ -244,9 +244,7 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     }
 
     const issueKey = match.mapping.jiraKey;
-    const hasCustomDescription =
-      typeof match.mapping.description === 'string' &&
-      match.mapping.description.length > 0;
+    const hasCustomDescription = typeof match.mapping.description === 'string';
 
     const comment = hasCustomDescription
       ? match.mapping.description!
