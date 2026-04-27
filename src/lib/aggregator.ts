@@ -11,6 +11,7 @@ export interface WorklogEntry {
   id: string;
   date: string;
   issueKey: string | null;
+  issueTitle?: string;
   minutes: number;
   comment: string;
   source: 'commit' | 'review' | 'meeting' | 'manual';

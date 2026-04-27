@@ -564,7 +564,7 @@
               </div>
             {:else}
               <span class="shrink-0 text-gray-500 w-20 font-mono">{r.entry.date}</span>
-              <span class="shrink-0 text-blue-600 w-24 font-mono font-medium">
+              <span class="shrink-0 text-blue-600 w-24 font-mono font-medium" title={r.entry.issueTitle ?? r.entry.issueKey ?? ''}>
                 {r.entry.issueKey ?? '—'}
               </span>
             {/if}
