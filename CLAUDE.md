@@ -183,6 +183,18 @@ These were agreed with the user; don't relitigate unless they ask:
   `formatDuration`.
 - **Distribution:** unpacked extension from this git repo. `npm run
   build`, load `dist/` at `chrome://extensions`.
+- **Captcha gate (suspected-bot users):** the popup blocks its main UI
+  behind a math captcha for any Jira identity whose `emailAddress` is
+  in `GATED_EMAILS` in `src/lib/captcha-gate.ts`. The challenge is a
+  random 1-digit `+/-` problem rendered onto a `<canvas>` with per-glyph
+  rotation, jitter, and noise lines/dots — no digits land in the DOM,
+  so a bot reading `innerText` can't read the answer without OCR. Pass
+  state is held in `chrome.storage.session` (`captchaPassed: true`),
+  so it must be re-solved once per browser session. Gate logic lives
+  in `src/components/CaptchaGate.svelte`; the popup calls `getMyself()`
+  on mount to decide whether to show the gate. If `getMyself()` fails
+  the gate is skipped so the existing session-expired UI surfaces the
+  auth error normally. No third-party libraries.
 
 ## Known quirks / gotchas
 
