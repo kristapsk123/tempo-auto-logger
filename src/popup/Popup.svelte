@@ -170,18 +170,37 @@
   }
 
   function rebuildRows(p: LoadedPreview) {
+    // Snapshot user edits from existing non-manual rows keyed by entry ID so
+    // they survive re-aggregation (e.g. after saving an unmapped meeting mapping).
+    const prevEdits = new Map(
+      rows
+        .filter((r) => r.entry.source !== 'manual')
+        .map((r) => [
+          r.entry.id,
+          {
+            include: r.include,
+            hoursInput: r.hoursInput,
+            minutesInput: r.minutesInput,
+            minutes: r.entry.minutes,
+          },
+        ]),
+    );
     // Manual rows live only in the popup's rows state — preserve them across
     // re-aggregations (e.g. after saving an unmapped meeting mapping).
     const manual = rows.filter((r) => r.entry.source === 'manual');
     rows = [
-      ...p.entries.map((e) => ({
-        entry: e,
-        include: !p.alreadyLoggedIds.has(e.id),
-        alreadyLogged: p.alreadyLoggedIds.has(e.id),
-        postStatus: 'idle' as const,
-        hoursInput: Math.floor(e.minutes / 60),
-        minutesInput: e.minutes % 60,
-      })),
+      ...p.entries.map((e) => {
+        const alreadyLogged = p.alreadyLoggedIds.has(e.id);
+        const prev = prevEdits.get(e.id);
+        return {
+          entry: prev ? { ...e, minutes: prev.minutes } : e,
+          include: alreadyLogged ? false : (prev ? prev.include : true),
+          alreadyLogged,
+          postStatus: 'idle' as const,
+          hoursInput: prev ? prev.hoursInput : Math.floor(e.minutes / 60),
+          minutesInput: prev ? prev.minutesInput : e.minutes % 60,
+        };
+      }),
       ...manual,
     ];
     // Preserve any inputs the user has already typed: check in-memory state
