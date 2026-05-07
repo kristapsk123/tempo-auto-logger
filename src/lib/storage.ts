@@ -110,6 +110,7 @@ const SESSION_KEYS = {
   POPUP_DATE_FROM: 'popupDateFrom',
   POPUP_DATE_TO: 'popupDateTo',
   UNMAPPED_INPUTS: 'unmappedInputs',
+  CAPTCHA_PASSED: 'captchaPassed',
 } as const;
 
 export async function getSessionPopupDates(): Promise<{
@@ -159,5 +160,14 @@ export async function setSessionUnmappedInputs(
 
 export async function clearSessionUnmappedInputs(): Promise<void> {
   await chrome.storage.session.remove(SESSION_KEYS.UNMAPPED_INPUTS);
+}
+
+export async function getSessionCaptchaPassed(): Promise<boolean> {
+  const result = await chrome.storage.session.get(SESSION_KEYS.CAPTCHA_PASSED);
+  return result[SESSION_KEYS.CAPTCHA_PASSED] === true;
+}
+
+export async function setSessionCaptchaPassed(): Promise<void> {
+  await chrome.storage.session.set({ [SESSION_KEYS.CAPTCHA_PASSED]: true });
 }
 

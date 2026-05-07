@@ -9,8 +9,10 @@
   import {
     addUserMeetingMapping,
     getGithubToken,
+    getSessionCaptchaPassed,
     getSessionPopupDates,
     getSessionUnmappedInputs,
+    setSessionCaptchaPassed,
     setSessionPopupDates,
     setSessionUnmappedInputs,
     clearSessionUnmappedInputs,
@@ -20,6 +22,9 @@
   import type { CalendarEvent } from '../lib/calendar-client';
   import { SessionExpiredError, type AuthService } from '../lib/http';
   import { JIRA_BASE_URL, CALENDAR_BASE_URL } from '../lib/config';
+  import { getMyself } from '../lib/jira-client';
+  import { isEmailGated } from '../lib/captcha-gate';
+  import CaptchaGate from '../components/CaptchaGate.svelte';
 
   type RowState = {
     entry: WorklogEntry;
@@ -41,6 +46,8 @@
     saving: boolean;
   };
 
+  // null = not-yet-decided, true = blocking, false = passed / not required
+  let captchaRequired = $state<boolean | null>(null);
   let hasPat = $state<boolean | null>(null); // null = loading
   let dateFrom = $state(isoDate(-1));
   let dateTo = $state(isoDate(-1));
@@ -72,8 +79,37 @@
         dateTo = savedDates.dateTo;
       }
       sessionUnmappedInputs = savedInputs;
+
+      try {
+        const me = await getMyself();
+        const gated = isEmailGated(me.emailAddress);
+        const alreadyPassed = gated ? await getSessionCaptchaPassed() : false;
+        console.log('[captcha-gate] getMyself()', {
+          emailAddress: me.emailAddress,
+          name: me.name,
+          key: me.key,
+          gated,
+          alreadyPassed,
+        });
+        if (!gated) {
+          captchaRequired = false;
+        } else {
+          captchaRequired = !alreadyPassed;
+        }
+        console.log('[captcha-gate] decision', { captchaRequired });
+      } catch (err) {
+        console.warn('[captcha-gate] getMyself() failed, skipping gate', err);
+        // Identity lookup failed — fall through to the main UI so the
+        // existing session-expired handling can surface the error.
+        captchaRequired = false;
+      }
     })();
   });
+
+  async function handleCaptchaPass(): Promise<void> {
+    await setSessionCaptchaPassed();
+    captchaRequired = false;
+  }
 
   // Sync unmapped row inputs to session storage so they survive popup close.
   // When all meetings are mapped (unmapped becomes empty), clear the cache.
@@ -390,6 +426,13 @@
   }
 </script>
 
+{#if captchaRequired === null}
+  <main class="p-4 w-[32rem] min-h-[360px] font-sans bg-gray-50 text-sm text-slate-600">
+    Loading…
+  </main>
+{:else if captchaRequired}
+  <CaptchaGate onPass={handleCaptchaPass} />
+{:else}
 <main class="p-4 w-[32rem] min-h-[360px] font-sans bg-gray-50">
   <header class="flex items-start justify-between mb-3">
     <div>
@@ -718,6 +761,7 @@
     </div>
   {/if}
 </main>
+{/if}
 
 <style>
   /* Hide spinner arrows on minute inputs — they waste space in the tight row layout. */
