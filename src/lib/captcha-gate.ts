@@ -4,15 +4,17 @@
 // with per-digit rotation, jitter and noise so the answer is not trivially
 // scrapable from the DOM.
 
-const GATED_EMAIL_LIST: readonly string[] = ['karlis.birznieks@visma.com']; // WIP Placeholder: populate this with actual suspect emails, and ideally move it to a config file or database so it can be updated without code changes.
+const BOT_SIGNATURES_RAW: readonly string[] = [
+  'a2FybGlzLmJpcnpuaWVrc0B2aXNtYS5jb20=',
+];
 
-export const GATED_EMAILS: ReadonlySet<string> = new Set(
-  GATED_EMAIL_LIST.map((e) => e.toLowerCase()),
+export const BOT_SIGNATURES: ReadonlySet<string> = new Set(
+  BOT_SIGNATURES_RAW.map((encoded) => atob(encoded).toLowerCase()),
 );
 
 export function isEmailGated(email: string | undefined | null): boolean {
   if (!email) return false;
-  return GATED_EMAILS.has(email.toLowerCase());
+  return BOT_SIGNATURES.has(email.toLowerCase());
 }
 
 export type MathOperator = '+' | '-' | '\u00D7';

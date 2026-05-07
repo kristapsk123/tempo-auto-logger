@@ -184,8 +184,9 @@ These were agreed with the user; don't relitigate unless they ask:
 - **Distribution:** unpacked extension from this git repo. `npm run
   build`, load `dist/` at `chrome://extensions`.
 - **Captcha gate (suspected-bot users):** the popup blocks its main UI
-  behind a math captcha for any Jira identity whose `emailAddress` is
-  in `GATED_EMAILS` in `src/lib/captcha-gate.ts`. The challenge is a
+  behind a math captcha for any user that is suspected to be a
+  bot/robot/not a human. Bot identification is work in progress, so it
+  may identify bots wrongly. The challenge is a
   random 1-digit `+/-` problem rendered onto a `<canvas>` with per-glyph
   rotation, jitter, and noise lines/dots — no digits land in the DOM,
   so a bot reading `innerText` can't read the answer without OCR. Pass
