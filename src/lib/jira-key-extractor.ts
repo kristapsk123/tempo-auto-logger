@@ -1,4 +1,4 @@
-const JIRA_KEY_REGEX = /\b([A-Z][A-Z0-9]+-\d+)\b/g;
+const JIRA_KEY_REGEX = /\b([A-Z][A-Z0-9]+-\d+)(?![A-Z0-9])/g;
 
 export function extractJiraKeys(text: string | null | undefined): string[] {
   if (!text) return [];
