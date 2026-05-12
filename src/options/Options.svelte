@@ -1,13 +1,16 @@
 <script lang="ts">
   import {
     DEFAULT_ATTENDANCE_FILTER,
+    clearFallbackCommitJira,
     clearGithubToken,
     getAttendanceFilter,
+    getFallbackCommitJira,
     getGithubToken,
     getUserMeetingMappings,
     getUserTemplates,
     replaceUserMeetingMappings,
     setAttendanceFilter,
+    setFallbackCommitJira,
     setGithubToken,
     setUserTemplates,
   } from '../lib/storage';
@@ -59,6 +62,9 @@
   let patEditing = $state(false);
   let patSavedFlash = $state(false);
 
+  let fallbackCommitJira = $state('');
+  let fallbackCommitJiraSavedFlash = $state(false);
+
   // Templates tab
   let templateInputs = $state({
     commit: '',
@@ -72,11 +78,12 @@
 
   $effect(() => {
     void (async () => {
-      const [af, mappings, token, userT] = await Promise.all([
+      const [af, mappings, token, userT, savedFallback] = await Promise.all([
         getAttendanceFilter(),
         getUserMeetingMappings(),
         getGithubToken(),
         getUserTemplates(),
+        getFallbackCommitJira(),
       ]);
       attendanceFilter = af;
       userMappings = mappings.map((m) => ({
@@ -95,6 +102,7 @@
         patStoredLength = 0;
         patEditing = true;
       }
+      fallbackCommitJira = savedFallback ?? '';
       templateInputs = {
         commit: userT.commit ?? teamDefaults.descriptionTemplates.commit,
         review: userT.review ?? teamDefaults.descriptionTemplates.review,
@@ -196,6 +204,17 @@
     patStoredLength = 0;
     pat = '';
     patEditing = true;
+  }
+
+  async function saveFallbackCommitJira() {
+    const trimmed = fallbackCommitJira.trim().toUpperCase();
+    if (trimmed.length === 0) {
+      await clearFallbackCommitJira();
+    } else {
+      await setFallbackCommitJira(trimmed);
+      fallbackCommitJira = trimmed;
+    }
+    flash((v) => (fallbackCommitJiraSavedFlash = v));
   }
 
   async function saveTemplates() {
@@ -531,6 +550,34 @@
                 classic, or <code>Contents: Read</code> + <code>Pull requests: Read</code>
                 + <code>Metadata: Read</code> for fine-grained.
               </p>
+            </div>
+
+            <div class="pt-3 border-t border-gray-200">
+              <h3 class="text-sm font-medium text-gray-900 mb-1">
+                Fallback Jira issue for commits without a key
+              </h3>
+              <p class="text-xs text-gray-600 mb-2">
+                When set, commits whose message contains no Jira key (e.g.
+                <code>NUMO-123</code>) are logged under this issue instead of
+                being silently ignored. Leave blank to keep the old behaviour.
+              </p>
+              <div class="flex items-center gap-2">
+                <JiraPicker
+                  bind:value={fallbackCommitJira}
+                  {favorites}
+                  size="normal"
+                  placeholder="e.g. NUMO-999"
+                />
+                <button
+                  class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded"
+                  onclick={saveFallbackCommitJira}
+                >
+                  Save
+                </button>
+                {#if fallbackCommitJiraSavedFlash}
+                  <span class="text-sm text-green-700">Saved ✓</span>
+                {/if}
+              </div>
             </div>
 
             <div class="pt-3 border-t border-gray-200">
