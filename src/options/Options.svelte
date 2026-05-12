@@ -225,7 +225,7 @@
   const previewSample = $derived.by(() => {
     const fake = aggregate({
       commits: [
-        { date: '2026-04-20', jiraKey: 'NUMO-123', repo: 'Visma/example', commitSha: 'abc', message: 'example' },
+        { date: '2026-04-20', committedAt: '2026-04-20T09:00:00Z', jiraKey: 'NUMO-123', repo: 'Visma/example', commitSha: 'abc', message: 'example' },
       ],
       reviews: [
         {
