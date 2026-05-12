@@ -1,0 +1,61 @@
+name: Claude on comment
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: claude-comment-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  respond:
+    # Run only when the comment / review body contains @claude or /claude.
+    # The workflow if: is the real gate. trigger_phrase below is set to the
+    # substring "claude" so the action's built-in detection matches either
+    # the @ or / prefix.
+    if: |
+      (github.event_name == 'issue_comment' &&
+        (contains(github.event.comment.body, '@claude') ||
+         contains(github.event.comment.body, '/claude'))) ||
+      (github.event_name == 'pull_request_review_comment' &&
+        (contains(github.event.comment.body, '@claude') ||
+         contains(github.event.comment.body, '/claude'))) ||
+      (github.event_name == 'pull_request_review' &&
+        (contains(github.event.review.body, '@claude') ||
+         contains(github.event.review.body, '/claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Configure git identity
+        run: |
+          git config user.name "claude-agent[bot]"
+          git config user.email "claude-agent[bot]@users.noreply.github.com"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          trigger_phrase: "claude"
+          claude_args: >-
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(node:*),Bash(ls:*),Bash(printenv:*)"
