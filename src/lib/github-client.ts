@@ -36,7 +36,7 @@ export async function getGithubUser(token: string): Promise<GithubUser> {
 export interface CommitActivity {
   date: string;
   committedAt: string;
-  jiraKey: string;
+  jiraKey: string | null;
   repo: string;
   commitSha: string;
   message: string;
@@ -73,16 +73,26 @@ export async function searchMyCommits(params: {
     for (const item of data.items) {
       const firstLine = item.commit.message.split('\n')[0];
       const jiraKeys = extractJiraKeys(firstLine);
-      if (jiraKeys.length === 0) continue;
-      for (const jiraKey of jiraKeys) {
+      if (jiraKeys.length === 0) {
         results.push({
           date: item.commit.author.date.slice(0, 10),
           committedAt: item.commit.author.date,
-          jiraKey,
+          jiraKey: null,
           repo: item.repository.full_name,
           commitSha: item.sha,
           message: firstLine,
         });
+      } else {
+        for (const jiraKey of jiraKeys) {
+          results.push({
+            date: item.commit.author.date.slice(0, 10),
+            committedAt: item.commit.author.date,
+            jiraKey,
+            repo: item.repository.full_name,
+            commitSha: item.sha,
+            message: firstLine,
+          });
+        }
       }
     }
   }

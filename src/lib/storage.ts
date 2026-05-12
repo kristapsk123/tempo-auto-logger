@@ -9,6 +9,7 @@ const KEYS = {
   USER_MEETING_MAPPINGS: 'userMeetingMappings',
   ATTENDANCE_FILTER: 'attendanceFilter',
   USER_TEMPLATES: 'userDescriptionTemplates',
+  FALLBACK_COMMIT_JIRA: 'fallbackCommitJira',
 } as const;
 
 export const DEFAULT_ATTENDANCE_FILTER: AttendanceFilter = 'all-except-declined';
@@ -97,6 +98,20 @@ export async function setUserTemplates(
   templates: Partial<DescriptionTemplates>,
 ): Promise<void> {
   await chrome.storage.local.set({ [KEYS.USER_TEMPLATES]: templates });
+}
+
+export async function getFallbackCommitJira(): Promise<string | null> {
+  const result = await chrome.storage.local.get(KEYS.FALLBACK_COMMIT_JIRA);
+  const value = result[KEYS.FALLBACK_COMMIT_JIRA];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+export async function setFallbackCommitJira(jiraKey: string): Promise<void> {
+  await chrome.storage.local.set({ [KEYS.FALLBACK_COMMIT_JIRA]: jiraKey });
+}
+
+export async function clearFallbackCommitJira(): Promise<void> {
+  await chrome.storage.local.remove(KEYS.FALLBACK_COMMIT_JIRA);
 }
 
 // --- Session storage: popup state within a single browser session ---

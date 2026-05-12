@@ -39,6 +39,7 @@ export interface AggregatorInput {
   timeZone: string;
   dateFrom: string;
   dateTo: string;
+  fallbackCommitJira?: string | null;
 }
 
 export interface AggregatorOutput {
@@ -153,14 +154,16 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
     { date: string; issueKey: string; commits: Array<{ sha: string; message: string; repo: string; committedAt?: string }> }
   >();
   for (const c of input.commits) {
-    const key = `${c.date}:${c.jiraKey}`;
+    const effectiveKey = c.jiraKey ?? input.fallbackCommitJira ?? null;
+    if (!effectiveKey) continue;
+    const key = `${c.date}:${effectiveKey}`;
     const existing = commitGroups.get(key);
     if (existing) {
       existing.commits.push({ sha: c.commitSha, message: c.message, repo: c.repo, committedAt: c.committedAt });
     } else {
       commitGroups.set(key, {
         date: c.date,
-        issueKey: c.jiraKey,
+        issueKey: effectiveKey,
         commits: [{ sha: c.commitSha, message: c.message, repo: c.repo, committedAt: c.committedAt }],
       });
     }

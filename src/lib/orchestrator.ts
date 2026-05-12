@@ -31,6 +31,7 @@ import {
 } from './calendar-client';
 import {
   getAttendanceFilter,
+  getFallbackCommitJira,
   getGithubToken,
   getUserMeetingMappings,
   getUserTemplates,
@@ -89,10 +90,11 @@ export async function loadPreview(
   // GitHub activity (managers, QA, etc.) who shouldn't have to create a
   // token just to use the extension.
   const token = await getGithubToken();
-  const [userMappings, attendanceFilter, userTemplates] = await Promise.all([
+  const [userMappings, attendanceFilter, userTemplates, fallbackCommitJira] = await Promise.all([
     getUserMeetingMappings(),
     getAttendanceFilter(),
     getUserTemplates(),
+    getFallbackCommitJira(),
   ]);
   const orgs = githubOrgsConfig.orgs;
   const timeZone =
@@ -147,6 +149,7 @@ export async function loadPreview(
     timeZone,
     dateFrom,
     dateTo,
+    fallbackCommitJira,
   });
 
   await attachIssueTitles(aggregated.entries);
@@ -262,10 +265,11 @@ export async function reaggregate(
   dateFrom: string,
   dateTo: string,
 ): Promise<ReaggregatedPreview> {
-  const [userMappings, attendanceFilter, userTemplates] = await Promise.all([
+  const [userMappings, attendanceFilter, userTemplates, fallbackCommitJira] = await Promise.all([
     getUserMeetingMappings(),
     getAttendanceFilter(),
     getUserTemplates(),
+    getFallbackCommitJira(),
   ]);
   const aggregated = aggregate({
     commits: cached.commits,
@@ -278,6 +282,7 @@ export async function reaggregate(
     timeZone: cached.timeZone,
     dateFrom,
     dateTo,
+    fallbackCommitJira,
   });
   await attachIssueTitles(aggregated.entries);
   return {
