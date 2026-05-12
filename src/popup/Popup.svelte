@@ -457,6 +457,24 @@
     if (m === 0) return `${h}h`;
     return `${h}h ${m}m`;
   }
+
+  function handleDateFromChange(newFrom: string) {
+    if (!newFrom || !dateTo) {
+      dateFrom = newFrom;
+      return;
+    }
+    if (newFrom > dateTo) {
+      const deltaMs = Math.max(
+        0,
+        new Date(dateTo + 'T00:00:00').getTime() -
+          new Date(dateFrom + 'T00:00:00').getTime(),
+      );
+      const newToMs = new Date(newFrom + 'T00:00:00').getTime() + deltaMs;
+      const d = new Date(newToMs);
+      dateTo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    dateFrom = newFrom;
+  }
 </script>
 
 {#if captchaRequired === null}
@@ -533,7 +551,8 @@
           From
           <input
             type="date"
-            bind:value={dateFrom}
+            value={dateFrom}
+            onchange={(e) => handleDateFromChange((e.currentTarget as HTMLInputElement).value)}
             class="px-1.5 py-1 border border-gray-300 rounded bg-white"
           />
         </label>
