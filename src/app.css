@@ -1,3 +1,89 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Neon theme: applied when <html class="neon-theme"> */
+
+html.neon-theme,
+html.neon-theme body {
+  color-scheme: dark;
+  background-color: #07071a;
+}
+
+/* CRT scanline overlay */
+html.neon-theme body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.1) 3px,
+    rgba(0, 0, 0, 0.1) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Retro code styling */
+html.neon-theme code {
+  color: #cc44ff;
+  background: rgba(204, 68, 255, 0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+html.neon-theme strong {
+  color: #e8e0ff;
+}
+
+/* Dark colour-scheme for native date/number inputs */
+html.neon-theme input[type='date'],
+html.neon-theme input[type='number'],
+html.neon-theme input[type='password'],
+html.neon-theme input[type='text'] {
+  color-scheme: dark;
+}
+
+html.neon-theme input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) sepia(1) saturate(4) hue-rotate(250deg);
+  opacity: 0.8;
+}
+
+@keyframes retro-glow {
+  0%,
+  100% {
+    text-shadow:
+      0 0 8px #ff2d78,
+      0 0 20px rgba(255, 45, 120, 0.5);
+    color: #ff9fca;
+  }
+  50% {
+    text-shadow:
+      0 0 14px #ff2d78,
+      0 0 30px rgba(255, 45, 120, 0.7),
+      0 0 50px rgba(255, 45, 120, 0.2);
+    color: #ff2d78;
+  }
+}
+
+@layer utilities {
+  html.neon-theme .retro-glow-text {
+    color: #ff9fca;
+    animation: retro-glow 2.5s ease-in-out infinite;
+  }
+
+  html.neon-theme .retro-grid {
+    background-image:
+      linear-gradient(rgba(0, 245, 212, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 245, 212, 0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  html.neon-theme .neon-text-cyan {
+    text-shadow:
+      0 0 8px #00f5d4,
+      0 0 20px rgba(0, 245, 212, 0.5);
+  }
+}

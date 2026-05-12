@@ -9,6 +9,8 @@
   import {
     addUserMeetingMapping,
     getGithubToken,
+    getNeonTheme,
+    setNeonTheme,
     getSessionCaptchaPassed,
     getSessionPopupDates,
     getSessionUnmappedInputs,
@@ -25,6 +27,7 @@
   import { getMyself } from '../lib/jira-client';
   import { isEmailGated } from '../lib/captcha-gate';
   import CaptchaGate from '../components/CaptchaGate.svelte';
+  import { theme, applyThemeClass } from '../lib/theme.svelte';
 
   type RowState = {
     entry: WorklogEntry;
@@ -69,10 +72,11 @@
 
   $effect(() => {
     void (async () => {
-      const [t, savedDates, savedInputs] = await Promise.all([
+      const [t, savedDates, savedInputs, neon] = await Promise.all([
         getGithubToken(),
         getSessionPopupDates().catch(() => ({ dateFrom: null, dateTo: null })),
         getSessionUnmappedInputs().catch(() => ({} as UnmappedInputCache)),
+        getNeonTheme(),
       ]);
       hasPat = !!t;
       if (savedDates.dateFrom && savedDates.dateTo) {
@@ -80,6 +84,8 @@
         dateTo = savedDates.dateTo;
       }
       sessionUnmappedInputs = savedInputs;
+      theme.neon = neon;
+      applyThemeClass(neon);
 
       try {
         const me = await getMyself();
@@ -110,6 +116,13 @@
   async function handleCaptchaPass(): Promise<void> {
     await setSessionCaptchaPassed();
     captchaRequired = false;
+  }
+
+  async function toggleNeon() {
+    const next = !theme.neon;
+    theme.neon = next;
+    applyThemeClass(next);
+    await setNeonTheme(next);
   }
 
   // Sync unmapped row inputs to session storage so they survive popup close.
@@ -415,6 +428,12 @@
   }
 
   function sourceColor(source: WorklogEntry['source']): string {
+    if (theme.neon) {
+      if (source === 'commit') return 'text-neon-orange';
+      if (source === 'review') return 'text-neon-purple';
+      if (source === 'manual') return 'text-neon-purple';
+      return 'text-neon-cyan';
+    }
     if (source === 'commit') return 'text-orange-600';
     if (source === 'review') return 'text-purple-600';
     if (source === 'manual') return 'text-indigo-600';
@@ -422,11 +441,23 @@
   }
 
   function rowBg(r: RowState): string {
+    if (theme.neon) {
+      if (r.postStatus === 'ok') return 'bg-neon-green-bg border-neon-green';
+      if (r.postStatus === 'fail') return 'bg-neon-red-bg border-neon-red';
+      if (r.postStatus === 'posting') return 'bg-neon-blue-bg border-neon-blue';
+      if (r.alreadyLogged) return 'bg-retro-bg border-retro-border opacity-60';
+      return 'bg-retro-surface2 border-retro-border';
+    }
     if (r.postStatus === 'ok') return 'bg-green-50 border-green-200';
     if (r.postStatus === 'fail') return 'bg-red-50 border-red-200';
     if (r.postStatus === 'posting') return 'bg-blue-50 border-blue-200';
     if (r.alreadyLogged) return 'bg-gray-50 border-gray-200 opacity-60';
     return 'bg-white border-gray-200';
+  }
+
+  // Shorthand: picks neon class when neon theme is active, otherwise default
+  function n(neonClass: string, baseClass: string): string {
+    return theme.neon ? neonClass : baseClass;
   }
 
   let toPostRows = $derived(
@@ -478,29 +509,39 @@
 </script>
 
 {#if captchaRequired === null}
-  <main class="p-4 w-[38.25rem] min-h-[360px] font-sans bg-gray-50 text-sm text-slate-600">
+  <main class="p-4 w-[38.25rem] min-h-[360px] font-sans {n('bg-retro-bg retro-grid text-retro-text', 'bg-gray-50 text-slate-600')} text-sm">
     Loading…
   </main>
 {:else if captchaRequired}
   <CaptchaGate onPass={handleCaptchaPass} />
 {:else}
-<main class="p-4 w-[38.25rem] min-h-[360px] font-sans bg-gray-50">
+<main class="p-4 w-[38.25rem] min-h-[360px] font-sans {n('bg-retro-bg retro-grid', 'bg-gray-50')}">
   <header class="flex items-start justify-between mb-3">
     <div>
-      <h1 class="text-lg font-semibold text-gray-900">Tempo Auto Logger</h1>
-      <p class="text-xs text-gray-500 mt-0.5">
+      <h1 class="text-lg font-semibold {n('retro-glow-text', 'text-gray-900')}">Tempo Auto Logger</h1>
+      <p class="text-xs {n('text-retro-muted', 'text-gray-500')} mt-0.5">
         Log commits, reviews and meetings to Tempo
       </p>
     </div>
     <div class="flex items-center gap-2">
       <button
-        class="text-xs text-blue-600 hover:underline"
+        class="text-xs px-1.5 py-0.5 rounded border {theme.neon
+          ? 'border-neon-pink text-neon-pink hover:bg-neon-pink-bg shadow-neon-pink'
+          : 'border-gray-300 text-gray-500 hover:bg-gray-100'}"
+        onclick={toggleNeon}
+        title={theme.neon ? 'Disable neon theme' : 'Enable neon theme'}
+        aria-label="Toggle neon theme"
+      >
+        {theme.neon ? 'Neon ON' : 'Neon OFF'}
+      </button>
+      <button
+        class="text-xs {n('text-neon-cyan', 'text-blue-600')} hover:underline"
         onclick={() => chrome.runtime.openOptionsPage()}
       >
         Settings
       </button>
       <button
-        class="text-gray-400 hover:text-gray-700 text-base leading-none"
+        class="{n('text-retro-dim hover:text-retro-bright', 'text-gray-400 hover:text-gray-700')} text-base leading-none"
         onclick={() => window.close()}
         title="Close"
         aria-label="Close"
@@ -512,13 +553,13 @@
 
   {#if hasPat !== null}
     {#if hasPat === false}
-      <div class="mb-2 px-2.5 py-1.5 bg-sky-50 border border-sky-200 rounded text-[11px] text-sky-900 flex items-center justify-between gap-2">
+      <div class="mb-2 px-2.5 py-1.5 {n('bg-neon-blue-bg border border-neon-blue text-neon-blue', 'bg-sky-50 border border-sky-200 text-sky-900')} rounded text-[11px] flex items-center justify-between gap-2">
         <span>
           <span class="font-medium">Meetings-only mode.</span>
           Add a GitHub token in Settings to also log commits and PR reviews.
         </span>
         <button
-          class="shrink-0 text-sky-700 hover:underline"
+          class="shrink-0 {n('text-neon-cyan', 'text-sky-700')} hover:underline"
           onclick={() => chrome.runtime.openOptionsPage()}
         >
           Settings
@@ -536,8 +577,8 @@
         ] as preset (preset.label)}
           <button
             class="px-2.5 py-1 border text-xs rounded {activePreset === preset.label
-              ? 'border-blue-500 bg-blue-100 text-blue-800 font-medium'
-              : 'border-gray-300 hover:bg-gray-100 bg-white'}"
+              ? n('border-neon-cyan bg-neon-cyan-bg text-neon-cyan font-medium shadow-neon-cyan', 'border-blue-500 bg-blue-100 text-blue-800 font-medium')
+              : n('border-retro-border2 hover:bg-retro-surface2 bg-retro-surface text-retro-text', 'border-gray-300 hover:bg-gray-100 bg-white')}"
             disabled={loading || posting}
             onclick={preset.action}
           >
@@ -546,14 +587,14 @@
         {/each}
       </div>
 
-      <div class="flex items-center gap-2 text-xs text-gray-700">
+      <div class="flex items-center gap-2 text-xs {n('text-retro-text', 'text-gray-700')}">
         <label class="flex items-center gap-1">
           From
           <input
             type="date"
             value={dateFrom}
             onchange={(e) => handleDateFromChange((e.currentTarget as HTMLInputElement).value)}
-            class="px-1.5 py-1 border border-gray-300 rounded bg-white"
+            class="px-1.5 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-gray-300 bg-white')} rounded"
           />
         </label>
         <label class="flex items-center gap-1">
@@ -561,17 +602,17 @@
           <input
             type="date"
             bind:value={dateTo}
-            class="px-1.5 py-1 border border-gray-300 rounded bg-white"
+            class="px-1.5 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-gray-300 bg-white')} rounded"
           />
         </label>
       </div>
 
       {#if rangeError}
-        <div class="text-xs text-red-700">{rangeError}</div>
+        <div class="text-xs {n('text-neon-red', 'text-red-700')}">{rangeError}</div>
       {/if}
 
       <button
-        class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+        class="w-full px-3 py-2 {n('bg-neon-pink hover:bg-neon-pink-dark disabled:bg-retro-border2 disabled:shadow-none shadow-neon-pink', 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300')} text-white text-sm rounded disabled:cursor-not-allowed font-medium"
         disabled={loading || posting || rangeError !== null}
         onclick={() => load(dateFrom, dateTo)}
       >
@@ -581,18 +622,18 @@
   {/if}
 
   {#if loadError}
-    <div class="mt-3 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+    <div class="mt-3 p-2.5 {n('bg-neon-red-bg border border-neon-red text-neon-red', 'bg-red-50 border border-red-200 text-red-800')} rounded text-xs">
       <div class="font-medium mb-1">⚠ {loadError}</div>
       {#if loadErrorService === 'jira'}
         <button
-          class="mt-1 px-2 py-1 border border-red-300 hover:bg-red-100 rounded text-xs"
+          class="mt-1 px-2 py-1 border {n('border-neon-red-dark hover:bg-neon-red-bg text-neon-red', 'border-red-300 hover:bg-red-100')} rounded text-xs"
           onclick={openJira}
         >
           Open Jira to log in
         </button>
       {:else if loadErrorService === 'calendar'}
         <button
-          class="mt-1 px-2 py-1 border border-red-300 hover:bg-red-100 rounded text-xs"
+          class="mt-1 px-2 py-1 border {n('border-neon-red-dark hover:bg-neon-red-bg text-neon-red', 'border-red-300 hover:bg-red-100')} rounded text-xs"
           onclick={openCalendar}
         >
           Open Calendar to log in
@@ -602,27 +643,27 @@
   {/if}
 
   {#if preview}
-    <div class="mt-3 bg-white border border-gray-200 rounded shadow-sm">
-      <div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-        <div class="text-xs text-gray-700">
+    <div class="mt-3 {n('bg-retro-surface border-retro-border', 'bg-white border-gray-200')} border rounded shadow-sm">
+      <div class="px-3 py-2 border-b {n('border-retro-border', 'border-gray-200')} flex items-center justify-between">
+        <div class="text-xs {n('text-retro-text', 'text-gray-700')}">
           <span class="font-medium">{preview.dateFrom}</span>
           {#if preview.dateFrom !== preview.dateTo}
             <span> → {preview.dateTo}</span>
           {/if}
         </div>
-        <div class="text-[11px] text-gray-500">
+        <div class="text-[11px] {n('text-retro-dim', 'text-gray-500')}">
           {rows.length} entries · {rows.filter((r) => r.alreadyLogged).length} already logged · {unmapped.length} unmapped · {preview.skippedByMapping} skipped by mapping · {preview.skippedAllDay} all-day · {preview.skippedByAttendance} declined
         </div>
       </div>
 
       <div class="max-h-64 overflow-auto p-2 space-y-1">
         {#if rows.length === 0}
-          <div class="text-xs text-gray-500 italic text-center py-4">
+          <div class="text-xs {n('text-retro-muted', 'text-gray-500')} italic text-center py-4">
             No commits, reviews or mapped meetings in this date range
           </div>
         {/if}
         <button
-          class="w-full px-2 py-1 border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded text-xs"
+          class="w-full px-2 py-1 border border-dashed {n('border-neon-purple text-neon-purple hover:bg-neon-purple-bg', 'border-indigo-300 text-indigo-700 hover:bg-indigo-50')} rounded text-xs"
           onclick={addManualRow}
           disabled={posting}
         >
@@ -633,7 +674,7 @@
           <div class="flex items-center gap-2 px-2 py-1.5">
             <input
               type="checkbox"
-              class="shrink-0"
+              class="shrink-0 {n('accent-neon-cyan', '')}"
               bind:checked={r.include}
               disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
             />
@@ -643,7 +684,7 @@
             {#if r.entry.source === 'manual'}
               <input
                 type="date"
-                class="shrink-0 w-28 px-1 py-0.5 border border-gray-300 rounded font-mono text-gray-700 bg-white disabled:bg-gray-50"
+                class="shrink-0 w-28 px-1 py-0.5 border {n('border-retro-border2 font-mono text-retro-text bg-retro-surface disabled:bg-retro-bg', 'border-gray-300 font-mono text-gray-700 bg-white disabled:bg-gray-50')} rounded"
                 bind:value={r.entry.date}
                 disabled={posting || r.postStatus === 'ok'}
                 title="Date"
@@ -659,10 +700,10 @@
                 />
               </div>
             {:else}
-              <span class="shrink-0 text-gray-500 w-20 font-mono">{r.entry.date}</span>
+              <span class="shrink-0 {n('text-retro-muted', 'text-gray-500')} w-20 font-mono">{r.entry.date}</span>
               <div class="shrink-0 w-32 flex items-center gap-3">
                 <button
-                  class="text-blue-600 font-mono font-medium text-left hover:underline truncate"
+                  class="{n('text-neon-cyan', 'text-blue-600')} font-mono font-medium text-left hover:underline truncate"
                   title={r.entry.issueTitle ?? r.entry.issueKey ?? ''}
                   onclick={() => { if (r.entry.issueKey) chrome.tabs.create({ url: `${JIRA_BASE_URL}/browse/${r.entry.issueKey}` }); }}
                 >
@@ -670,14 +711,14 @@
                 </button>
                 {#if r.entry.source === 'review' && r.entry.sourceInfo.prNumber != null && r.entry.sourceInfo.repo}
                   <button
-                    class="shrink-0 text-purple-500 hover:text-purple-700 leading-none"
+                    class="shrink-0 {n('text-neon-purple hover:text-neon-purple-dark', 'text-purple-500 hover:text-purple-700')} leading-none"
                     title="Open PR #{r.entry.sourceInfo.prNumber} on GitHub"
                     onclick={() => chrome.tabs.create({ url: `https://github.com/${r.entry.sourceInfo.repo}/pull/${r.entry.sourceInfo.prNumber}` })}
                   >PR🔗</button>
                 {/if}
                 {#if r.entry.source === 'commit' && r.entry.sourceInfo.commits?.length}
                   <button
-                    class="shrink-0 text-orange-500 hover:text-orange-700 leading-none text-sm font-medium tabular-nums"
+                    class="shrink-0 {n('text-neon-orange hover:text-neon-orange-dark', 'text-orange-500 hover:text-orange-700')} leading-none text-sm font-medium tabular-nums"
                     title="{r.entry.sourceInfo.commits.length} commit{r.entry.sourceInfo.commits.length !== 1 ? 's' : ''} — click to {r.showCommitDetails ? 'hide' : 'show'}"
                     onclick={() => { r.showCommitDetails = !r.showCommitDetails; }}
                   >{r.entry.sourceInfo.commits.length}⎇</button>
@@ -688,49 +729,49 @@
               <input
                 type="number"
                 min="0"
-                class="w-9 px-1 py-0.5 border border-gray-300 rounded text-right font-mono text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500"
+                class="w-9 px-1 py-0.5 border {n('border-retro-border2 text-neon-yellow bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-gray-300 text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500')} rounded text-right font-mono"
                 bind:value={r.hoursInput}
                 oninput={() => syncRowMinutes(r)}
                 disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
                 aria-label="Hours"
               />
-              <span class="text-[10px] text-gray-500">h</span>
+              <span class="text-[10px] {n('text-retro-muted', 'text-gray-500')}">h</span>
               <input
                 type="number"
                 min="0"
-                class="w-9 px-1 py-0.5 border border-gray-300 rounded text-right font-mono text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500"
+                class="w-9 px-1 py-0.5 border {n('border-retro-border2 text-neon-yellow bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-gray-300 text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500')} rounded text-right font-mono"
                 bind:value={r.minutesInput}
                 oninput={() => syncRowMinutes(r)}
                 disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
                 aria-label="Minutes"
               />
-              <span class="text-[10px] text-gray-500">m</span>
+              <span class="text-[10px] {n('text-retro-muted', 'text-gray-500')}">m</span>
             </div>
             {#if r.entry.source === 'manual'}
               <input
                 type="text"
                 placeholder="description"
-                class="flex-1 min-w-0 px-1.5 py-0.5 border border-gray-300 rounded text-gray-700 bg-white disabled:bg-gray-50"
+                class="flex-1 min-w-0 px-1.5 py-0.5 border {n('border-retro-border2 text-retro-text bg-retro-surface disabled:bg-retro-bg', 'border-gray-300 text-gray-700 bg-white disabled:bg-gray-50')} rounded"
                 bind:value={r.entry.comment}
                 disabled={posting || r.postStatus === 'ok'}
               />
             {:else}
-              <span class="flex-1 min-w-0 text-gray-700 truncate" title={r.entry.comment}>
+              <span class="flex-1 min-w-0 {n('text-retro-text', 'text-gray-700')} truncate" title={r.entry.comment}>
                 {r.entry.comment}
               </span>
             {/if}
             <span class="shrink-0 w-4 text-right">
               {#if r.postStatus === 'posting'}
-                <span class="text-blue-600">…</span>
+                <span class="{n('text-neon-cyan', 'text-blue-600')}">…</span>
               {:else if r.postStatus === 'ok'}
-                <span class="text-green-600">✓</span>
+                <span class="{n('text-neon-green', 'text-green-600')}">✓</span>
               {:else if r.postStatus === 'fail'}
-                <span class="text-red-600" title={r.postError}>✗</span>
+                <span class="{n('text-neon-red', 'text-red-600')}" title={r.postError}>✗</span>
               {:else if r.alreadyLogged}
-                <span class="text-gray-500" title="Already logged in Tempo">⊘</span>
+                <span class="{n('text-retro-dim', 'text-gray-500')}" title="Already logged in Tempo">⊘</span>
               {:else if r.entry.source === 'manual'}
                 <button
-                  class="text-red-600 hover:bg-red-50 rounded"
+                  class="{n('text-neon-red hover:bg-neon-red-bg', 'text-red-600 hover:bg-red-50')} rounded"
                   onclick={() => removeManualRow(r.entry.id)}
                   disabled={posting}
                   title="Remove manual entry"
@@ -742,18 +783,18 @@
             </span>
           </div>
           {#if r.showCommitDetails && r.entry.source === 'commit' && r.entry.sourceInfo.commits?.length}
-            <div class="border-t border-orange-100 bg-orange-50 px-3 py-1.5 space-y-0.5">
+            <div class="border-t {n('border-neon-orange/30 bg-retro-surface', 'border-orange-100 bg-orange-50')} px-3 py-1.5 space-y-0.5">
               {#each r.entry.sourceInfo.commits as c}
                 <div class="flex gap-2 items-baseline">
                   <button
-                    class="font-mono text-[10px] text-orange-500 hover:text-orange-700 hover:underline shrink-0"
+                    class="font-mono text-[10px] {n('text-neon-orange hover:text-neon-orange-dark', 'text-orange-500 hover:text-orange-700')} hover:underline shrink-0"
                     title="Open commit on GitHub"
                     onclick={() => chrome.tabs.create({ url: `https://github.com/${c.repo}/commit/${c.sha}` })}
                   >{c.sha.slice(0, 7)}</button>
                   {#if c.committedAt}
-                    <span class="text-[10px] text-gray-400 shrink-0 tabular-nums">{formatCommitTime(c.committedAt)}</span>
+                    <span class="text-[10px] {n('text-retro-dim', 'text-gray-400')} shrink-0 tabular-nums">{formatCommitTime(c.committedAt)}</span>
                   {/if}
-                  <span class="text-[11px] text-gray-600 truncate" title={c.message}>{c.message.length > 72 ? c.message.slice(0, 72) + '…' : c.message}</span>
+                  <span class="text-[11px] {n('text-retro-text', 'text-gray-600')} truncate" title={c.message}>{c.message.length > 72 ? c.message.slice(0, 72) + '…' : c.message}</span>
                 </div>
               {/each}
             </div>
@@ -763,20 +804,20 @@
       </div>
 
       {#if unmapped.length > 0}
-        <div class="border-t border-gray-200 px-3 py-2 bg-amber-50">
-          <div class="text-xs font-medium text-amber-900 mb-1">
+        <div class="border-t {n('border-retro-border bg-neon-yellow-bg', 'border-gray-200 bg-amber-50')} px-3 py-2">
+          <div class="text-xs font-medium {n('text-neon-yellow', 'text-amber-900')} mb-1">
             Map {unmapped.length} meeting{unmapped.length === 1 ? '' : 's'} to Jira
           </div>
-          <div class="text-[10px] text-amber-700 mb-2">
+          <div class="text-[10px] {n('text-neon-yellow opacity-80', 'text-amber-700')} mb-2">
             Edit the match text to control future auto-mapping (substring, case-insensitive). Longest match wins.
           </div>
           <div class="space-y-1.5">
             {#each unmapped as u (u.event.id)}
-              <div class="bg-white rounded p-2 border border-amber-200">
-                <div class="text-xs text-gray-800 font-medium truncate" title={u.event.title}>
+              <div class="{n('bg-retro-surface2 border border-neon-yellow/40', 'bg-white border border-amber-200')} rounded p-2">
+                <div class="text-xs {n('text-retro-bright', 'text-gray-800')} font-medium truncate" title={u.event.title}>
                   {u.event.title}
                 </div>
-                <div class="text-[10px] text-gray-500 mb-1.5">
+                <div class="text-[10px] {n('text-retro-dim', 'text-gray-500')} mb-1.5">
                   {new Date(u.event.startMs).toLocaleString()} · {u.event.durationMinutes}m
                 </div>
                 <div class="flex gap-1.5 items-center">
@@ -784,7 +825,7 @@
                     type="text"
                     placeholder="match substring"
                     bind:value={u.matchInput}
-                    class="flex-1 px-1.5 py-1 border border-gray-300 rounded text-[11px]"
+                    class="flex-1 px-1.5 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-gray-300')} rounded text-[11px]"
                   />
                   <div class="w-32">
                     <JiraPicker
@@ -794,18 +835,18 @@
                     />
                   </div>
                   <label
-                    class="flex items-center gap-0.5 text-[10px] text-gray-700 cursor-pointer shrink-0"
+                    class="flex items-center gap-0.5 text-[10px] {n('text-retro-text', 'text-gray-700')} cursor-pointer shrink-0"
                     title="Drop this meeting — don't log it"
                   >
                     <input
                       type="checkbox"
-                      class="accent-amber-600 w-3 h-3"
+                      class="{n('accent-neon-yellow', 'accent-amber-600')} w-3 h-3"
                       bind:checked={u.skipInput}
                     />
                     Skip
                   </label>
                   <button
-                    class="px-2 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white text-[11px] rounded shrink-0"
+                    class="px-2 py-1 {n('bg-neon-orange hover:bg-neon-orange-dark disabled:bg-retro-border2', 'bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300')} text-white text-[11px] rounded shrink-0"
                     disabled={u.saving ||
                       !u.matchInput.trim() ||
                       (!u.skipInput &&
@@ -821,28 +862,28 @@
         </div>
       {/if}
 
-      <div class="border-t border-gray-200 px-3 py-2 flex items-center justify-between gap-2">
+      <div class="border-t {n('border-retro-border', 'border-gray-200')} px-3 py-2 flex items-center justify-between gap-2">
         {#if summary}
           <div class="text-xs">
-            <span class="text-green-700 font-medium">✓ {summary.ok} posted</span>
+            <span class="{n('text-neon-green', 'text-green-700')} font-medium">✓ {summary.ok} posted</span>
             {#if summary.fail > 0}
-              <span class="text-red-700 font-medium ml-2">✗ {summary.fail} failed</span>
+              <span class="{n('text-neon-red', 'text-red-700')} font-medium ml-2">✗ {summary.fail} failed</span>
             {/if}
             {#if summary.skipped > 0}
-              <span class="text-gray-500 ml-2">⊘ {summary.skipped} skipped</span>
+              <span class="{n('text-retro-muted', 'text-gray-500')} ml-2">⊘ {summary.skipped} skipped</span>
             {/if}
           </div>
         {:else}
-          <div class="text-xs text-gray-500">
+          <div class="text-xs {n('text-retro-muted', 'text-gray-500')}">
             {#if toPostCount > 0}
-              Ready to post {toPostCount} entries · <span class="font-medium text-gray-700">{formatDuration(toPostMinutes)}</span>
+              Ready to post {toPostCount} entries · <span class="font-medium {n('text-retro-text', 'text-gray-700')}">{formatDuration(toPostMinutes)}</span>
             {:else}
               Nothing to post — check entries above
             {/if}
           </div>
         {/if}
         <button
-          class="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+          class="px-4 py-1.5 {n('bg-neon-green-dark hover:bg-neon-green disabled:bg-retro-border2 disabled:shadow-none shadow-neon-green', 'bg-green-600 hover:bg-green-700 disabled:bg-gray-300')} text-white text-sm rounded disabled:cursor-not-allowed font-medium"
           disabled={posting || loading || toPostCount === 0}
           onclick={post}
         >
