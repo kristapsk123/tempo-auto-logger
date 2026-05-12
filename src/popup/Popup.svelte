@@ -439,6 +439,16 @@
     toPostRows.reduce((sum, r) => sum + (r.entry.minutes || 0), 0),
   );
 
+  function formatCommitTime(committedAt: string | undefined): string {
+    if (!committedAt) return '';
+    const d = new Date(committedAt);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${mm}-${dd} ${hh}:${min}`;
+  }
+
   function formatDuration(minutes: number): string {
     if (minutes <= 0) return '0m';
     const h = Math.floor(minutes / 60);
@@ -648,7 +658,7 @@
                 {/if}
                 {#if r.entry.source === 'commit' && r.entry.sourceInfo.commits?.length}
                   <button
-                    class="shrink-0 text-orange-500 hover:text-orange-700 leading-none text-[10px] font-medium tabular-nums"
+                    class="shrink-0 text-orange-500 hover:text-orange-700 leading-none text-sm font-medium tabular-nums"
                     title="{r.entry.sourceInfo.commits.length} commit{r.entry.sourceInfo.commits.length !== 1 ? 's' : ''} — click to {r.showCommitDetails ? 'hide' : 'show'}"
                     onclick={() => { r.showCommitDetails = !r.showCommitDetails; }}
                   >{r.entry.sourceInfo.commits.length}⎇</button>
@@ -716,7 +726,14 @@
             <div class="border-t border-orange-100 bg-orange-50 px-3 py-1.5 space-y-0.5">
               {#each r.entry.sourceInfo.commits as c}
                 <div class="flex gap-2 items-baseline">
-                  <span class="font-mono text-[10px] text-orange-400 shrink-0">{c.sha.slice(0, 7)}</span>
+                  <button
+                    class="font-mono text-[10px] text-orange-500 hover:text-orange-700 hover:underline shrink-0"
+                    title="Open commit on GitHub"
+                    onclick={() => chrome.tabs.create({ url: `https://github.com/${c.repo}/commit/${c.sha}` })}
+                  >{c.sha.slice(0, 7)}</button>
+                  {#if c.committedAt}
+                    <span class="text-[10px] text-gray-400 shrink-0 tabular-nums">{formatCommitTime(c.committedAt)}</span>
+                  {/if}
                   <span class="text-[11px] text-gray-600 truncate" title={c.message}>{c.message.length > 72 ? c.message.slice(0, 72) + '…' : c.message}</span>
                 </div>
               {/each}

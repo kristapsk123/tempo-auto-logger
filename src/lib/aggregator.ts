@@ -18,7 +18,7 @@ export interface WorklogEntry {
   include: boolean;
   sourceInfo: {
     commitCount?: number;
-    commits?: Array<{ sha: string; message: string; repo: string }>;
+    commits?: Array<{ sha: string; message: string; repo: string; committedAt?: string }>;
     prNumber?: number;
     prTitle?: string;
     repo?: string;
@@ -150,18 +150,18 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
 
   const commitGroups = new Map<
     string,
-    { date: string; issueKey: string; commits: Array<{ sha: string; message: string; repo: string }> }
+    { date: string; issueKey: string; commits: Array<{ sha: string; message: string; repo: string; committedAt?: string }> }
   >();
   for (const c of input.commits) {
     const key = `${c.date}:${c.jiraKey}`;
     const existing = commitGroups.get(key);
     if (existing) {
-      existing.commits.push({ sha: c.commitSha, message: c.message, repo: c.repo });
+      existing.commits.push({ sha: c.commitSha, message: c.message, repo: c.repo, committedAt: c.committedAt });
     } else {
       commitGroups.set(key, {
         date: c.date,
         issueKey: c.jiraKey,
-        commits: [{ sha: c.commitSha, message: c.message, repo: c.repo }],
+        commits: [{ sha: c.commitSha, message: c.message, repo: c.repo, committedAt: c.committedAt }],
       });
     }
   }
