@@ -233,6 +233,7 @@
             minutesInput: r.minutesInput,
             minutes: r.entry.minutes,
             showCommitDetails: r.showCommitDetails,
+            comment: r.entry.comment,
           },
         ]),
     );
@@ -244,7 +245,7 @@
         const alreadyLogged = p.alreadyLoggedIds.has(e.id);
         const prev = prevEdits.get(e.id);
         return {
-          entry: prev ? { ...e, minutes: prev.minutes } : e,
+          entry: prev ? { ...e, minutes: prev.minutes, comment: prev.comment } : e,
           include: alreadyLogged ? false : (prev ? prev.include : true),
           alreadyLogged,
           postStatus: 'idle' as const,
@@ -756,9 +757,13 @@
                 disabled={posting || r.postStatus === 'ok'}
               />
             {:else}
-              <span class="flex-1 min-w-0 {n('text-retro-text', 'text-gray-700')} truncate" title={r.entry.comment}>
-                {r.entry.comment}
-              </span>
+              <input
+                type="text"
+                class="flex-1 min-w-0 px-1.5 py-0.5 border {n('border-retro-border2 text-retro-text bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-gray-300 text-gray-700 bg-white disabled:bg-gray-50 disabled:text-gray-400')} rounded"
+                bind:value={r.entry.comment}
+                disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
+                title={r.entry.comment}
+              />
             {/if}
             <span class="shrink-0 w-4 text-right">
               {#if r.postStatus === 'posting'}
