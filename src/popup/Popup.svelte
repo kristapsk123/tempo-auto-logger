@@ -510,13 +510,13 @@
 </script>
 
 {#if captchaRequired === null}
-  <main class="p-4 w-[38.25rem] min-h-[360px] font-sans {n('bg-retro-bg retro-grid text-retro-text', 'bg-gray-50 text-slate-600')} text-sm">
+  <main class="p-4 min-w-[38.25rem] min-h-[360px] w-full max-w-[1280px] mx-auto font-sans {n('bg-retro-bg retro-grid text-retro-text', 'bg-gray-50 text-slate-600')} text-sm">
     Loading…
   </main>
 {:else if captchaRequired}
   <CaptchaGate onPass={handleCaptchaPass} />
 {:else}
-<main class="p-4 w-[38.25rem] min-h-[360px] font-sans {n('bg-retro-bg retro-grid', 'bg-gray-50')}">
+<main class="p-4 min-w-[38.25rem] min-h-[360px] w-full max-w-[1280px] mx-auto font-sans flex flex-col {n('bg-retro-bg retro-grid', 'bg-gray-50')}">
   <header class="flex items-start justify-between mb-3">
     <div>
       <h1 class="text-lg font-semibold {n('retro-glow-text', 'text-gray-900')}">Tempo Auto Logger</h1>
@@ -644,7 +644,7 @@
   {/if}
 
   {#if preview}
-    <div class="mt-3 {n('bg-retro-surface border-retro-border', 'bg-white border-gray-200')} border rounded shadow-sm">
+    <div class="mt-3 flex-1 flex flex-col min-h-0 {n('bg-retro-surface border-retro-border', 'bg-white border-gray-200')} border rounded shadow-sm">
       <div class="px-3 py-2 border-b {n('border-retro-border', 'border-gray-200')} flex items-center justify-between">
         <div class="text-xs {n('text-retro-text', 'text-gray-700')}">
           <span class="font-medium">{preview.dateFrom}</span>
@@ -657,7 +657,7 @@
         </div>
       </div>
 
-      <div class="max-h-64 overflow-auto p-2 space-y-1">
+      <div class="flex-1 min-h-0 overflow-auto p-2 space-y-1">
         {#if rows.length === 0}
           <div class="text-xs {n('text-retro-muted', 'text-gray-500')} italic text-center py-4">
             No commits, reviews or mapped meetings in this date range
