@@ -446,13 +446,13 @@
 </script>
 
 {#if captchaRequired === null}
-  <main class="p-4 w-[32rem] min-h-[360px] font-sans bg-gray-50 text-sm text-slate-600">
+  <main class="p-4 w-[38.25rem] min-h-[360px] font-sans bg-gray-50 text-sm text-slate-600">
     Loading…
   </main>
 {:else if captchaRequired}
   <CaptchaGate onPass={handleCaptchaPass} />
 {:else}
-<main class="p-4 w-[32rem] min-h-[360px] font-sans bg-gray-50">
+<main class="p-4 w-[38.25rem] min-h-[360px] font-sans bg-gray-50">
   <header class="flex items-start justify-between mb-3">
     <div>
       <h1 class="text-lg font-semibold text-gray-900">Tempo Auto Logger</h1>
@@ -626,13 +626,22 @@
               </div>
             {:else}
               <span class="shrink-0 text-gray-500 w-20 font-mono">{r.entry.date}</span>
-              <button
-                class="shrink-0 text-blue-600 w-24 font-mono font-medium text-left hover:underline"
-                title={r.entry.issueTitle ?? r.entry.issueKey ?? ''}
-                onclick={() => { if (r.entry.issueKey) chrome.tabs.create({ url: `${JIRA_BASE_URL}/browse/${r.entry.issueKey}` }); }}
-              >
-                {r.entry.issueKey ?? '—'}
-              </button>
+              <div class="shrink-0 w-32 flex items-center gap-3">
+                <button
+                  class="text-blue-600 font-mono font-medium text-left hover:underline truncate"
+                  title={r.entry.issueTitle ?? r.entry.issueKey ?? ''}
+                  onclick={() => { if (r.entry.issueKey) chrome.tabs.create({ url: `${JIRA_BASE_URL}/browse/${r.entry.issueKey}` }); }}
+                >
+                  {r.entry.issueKey ?? '—'}
+                </button>
+                {#if r.entry.source === 'review' && r.entry.sourceInfo.prNumber != null && r.entry.sourceInfo.repo}
+                  <button
+                    class="shrink-0 text-purple-500 hover:text-purple-700 leading-none"
+                    title="Open PR #{r.entry.sourceInfo.prNumber} on GitHub"
+                    onclick={() => chrome.tabs.create({ url: `https://github.com/${r.entry.sourceInfo.repo}/pull/${r.entry.sourceInfo.prNumber}` })}
+                  >PR🔗</button>
+                {/if}
+              </div>
             {/if}
             <div class="shrink-0 flex items-center gap-0.5" title="Hours and minutes">
               <input
@@ -665,17 +674,8 @@
                 disabled={posting || r.postStatus === 'ok'}
               />
             {:else}
-              <span class="flex-1 min-w-0 flex items-center gap-1 overflow-hidden">
-                <span class="text-gray-700 truncate" title={r.entry.comment}>
-                  {r.entry.comment}
-                </span>
-                {#if r.entry.source === 'review' && r.entry.sourceInfo.prNumber != null && r.entry.sourceInfo.repo}
-                  <button
-                    class="shrink-0 text-purple-500 hover:text-purple-700 leading-none"
-                    title="Open PR #{r.entry.sourceInfo.prNumber} on GitHub"
-                    onclick={() => chrome.tabs.create({ url: `https://github.com/${r.entry.sourceInfo.repo}/pull/${r.entry.sourceInfo.prNumber}` })}
-                  >↗</button>
-                {/if}
+              <span class="flex-1 min-w-0 text-gray-700 truncate" title={r.entry.comment}>
+                {r.entry.comment}
               </span>
             {/if}
             <span class="shrink-0 w-4 text-right">
