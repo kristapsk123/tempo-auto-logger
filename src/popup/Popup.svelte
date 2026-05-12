@@ -36,6 +36,7 @@
     // stays the source of truth for posting and the footer total.
     hoursInput: number;
     minutesInput: number;
+    showCommitDetails: boolean;
   };
 
   type UnmappedRow = {
@@ -218,6 +219,7 @@
             hoursInput: r.hoursInput,
             minutesInput: r.minutesInput,
             minutes: r.entry.minutes,
+            showCommitDetails: r.showCommitDetails,
           },
         ]),
     );
@@ -235,6 +237,7 @@
           postStatus: 'idle' as const,
           hoursInput: prev ? prev.hoursInput : Math.floor(e.minutes / 60),
           minutesInput: prev ? prev.minutesInput : e.minutes % 60,
+          showCommitDetails: prev?.showCommitDetails ?? false,
         };
       }),
       ...manual,
@@ -279,6 +282,7 @@
         postStatus: 'idle',
         hoursInput: 0,
         minutesInput: 30,
+        showCommitDetails: false,
       },
     ];
   }
@@ -596,7 +600,8 @@
           + Add manual entry
         </button>
         {#each rows as r (r.entry.id)}
-          <div class="flex items-center gap-2 px-2 py-1.5 border rounded text-xs {rowBg(r)}">
+          <div class="border rounded text-xs {rowBg(r)}">
+          <div class="flex items-center gap-2 px-2 py-1.5">
             <input
               type="checkbox"
               class="shrink-0"
@@ -640,6 +645,13 @@
                     title="Open PR #{r.entry.sourceInfo.prNumber} on GitHub"
                     onclick={() => chrome.tabs.create({ url: `https://github.com/${r.entry.sourceInfo.repo}/pull/${r.entry.sourceInfo.prNumber}` })}
                   >PR🔗</button>
+                {/if}
+                {#if r.entry.source === 'commit' && r.entry.sourceInfo.commits?.length}
+                  <button
+                    class="shrink-0 text-orange-500 hover:text-orange-700 leading-none text-[10px] font-medium tabular-nums"
+                    title="{r.entry.sourceInfo.commits.length} commit{r.entry.sourceInfo.commits.length !== 1 ? 's' : ''} — click to {r.showCommitDetails ? 'hide' : 'show'}"
+                    onclick={() => { r.showCommitDetails = !r.showCommitDetails; }}
+                  >{r.entry.sourceInfo.commits.length}⎇</button>
                 {/if}
               </div>
             {/if}
@@ -699,6 +711,17 @@
                 </button>
               {/if}
             </span>
+          </div>
+          {#if r.showCommitDetails && r.entry.source === 'commit' && r.entry.sourceInfo.commits?.length}
+            <div class="border-t border-orange-100 bg-orange-50 px-3 py-1.5 space-y-0.5">
+              {#each r.entry.sourceInfo.commits as c}
+                <div class="flex gap-2 items-baseline">
+                  <span class="font-mono text-[10px] text-orange-400 shrink-0">{c.sha.slice(0, 7)}</span>
+                  <span class="text-[11px] text-gray-600 truncate" title={c.message}>{c.message.length > 72 ? c.message.slice(0, 72) + '…' : c.message}</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
           </div>
         {/each}
       </div>
