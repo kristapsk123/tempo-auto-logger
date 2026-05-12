@@ -1,4 +1,4 @@
-import { firstJiraKey } from './jira-key-extractor';
+import { extractJiraKeys, firstJiraKey } from './jira-key-extractor';
 import { SessionExpiredError } from './http';
 
 const GITHUB_API = 'https://api.github.com';
@@ -71,15 +71,17 @@ export async function searchMyCommits(params: {
     };
     for (const item of data.items) {
       const firstLine = item.commit.message.split('\n')[0];
-      const jiraKey = firstJiraKey([firstLine]);
-      if (!jiraKey) continue;
-      results.push({
-        date: item.commit.author.date.slice(0, 10),
-        jiraKey,
-        repo: item.repository.full_name,
-        commitSha: item.sha,
-        message: firstLine,
-      });
+      const jiraKeys = extractJiraKeys(firstLine);
+      if (jiraKeys.length === 0) continue;
+      for (const jiraKey of jiraKeys) {
+        results.push({
+          date: item.commit.author.date.slice(0, 10),
+          jiraKey,
+          repo: item.repository.full_name,
+          commitSha: item.sha,
+          message: firstLine,
+        });
+      }
     }
   }
   return results;
