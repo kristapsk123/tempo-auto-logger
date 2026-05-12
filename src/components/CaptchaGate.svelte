@@ -67,7 +67,7 @@
   }
 </script>
 
-<main class="p-4 w-[32rem] min-h-[360px] font-sans bg-gray-50">
+<main class="p-4 w-[38.25rem] min-h-[360px] font-sans bg-gray-50">
   <header class="mb-3">
     <h1 class="text-lg font-semibold text-gray-900">Verify it's you</h1>
     <p class="text-xs text-gray-500 mt-0.5">
