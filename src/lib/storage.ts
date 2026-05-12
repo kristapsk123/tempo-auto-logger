@@ -10,6 +10,7 @@ const KEYS = {
   ATTENDANCE_FILTER: 'attendanceFilter',
   USER_TEMPLATES: 'userDescriptionTemplates',
   FALLBACK_COMMIT_JIRA: 'fallbackCommitJira',
+  NEON_THEME: 'neonTheme',
 } as const;
 
 export const DEFAULT_ATTENDANCE_FILTER: AttendanceFilter = 'all-except-declined';
@@ -112,6 +113,16 @@ export async function setFallbackCommitJira(jiraKey: string): Promise<void> {
 
 export async function clearFallbackCommitJira(): Promise<void> {
   await chrome.storage.local.remove(KEYS.FALLBACK_COMMIT_JIRA);
+}
+
+export async function getNeonTheme(): Promise<boolean> {
+  const result = await chrome.storage.local.get(KEYS.NEON_THEME);
+  // Default to true (neon on) when not yet set
+  return result[KEYS.NEON_THEME] !== false;
+}
+
+export async function setNeonTheme(enabled: boolean): Promise<void> {
+  await chrome.storage.local.set({ [KEYS.NEON_THEME]: enabled });
 }
 
 // --- Session storage: popup state within a single browser session ---

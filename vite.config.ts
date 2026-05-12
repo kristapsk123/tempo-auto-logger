@@ -6,6 +6,7 @@ import manifest from './src/manifest.config';
 export default defineConfig({
   plugins: [svelte(), crx({ manifest })],
   build: {
+    target: 'chrome89',
     rollupOptions: {
       input: {
         popup: 'src/popup/index.html',
