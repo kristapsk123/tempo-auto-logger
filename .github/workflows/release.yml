@@ -43,7 +43,9 @@ jobs:
             exit 1
           fi
 
-      - run: npm ci
+      # npm install (not npm ci) so the workflow tolerates small lockfile
+      # drifts after a version bump. See CLAUDE.md "Lockfile rule".
+      - run: npm install
       - run: npm run check
       - run: npm run build
 

@@ -289,6 +289,28 @@ After any meaningful change, ensure build + check pass, commit with a
 descriptive message (Co-Authored-By: Claude trailer per house style),
 push to `origin/master`.
 
+## Lockfile rule (READ BEFORE BUMPING VERSION)
+
+When you change `package.json` (especially bumping `version`), do a
+**full** `npm install`. **Never** use `npm install --package-lock-only`.
+
+Why: `--package-lock-only` produces a `package-lock.json` that looks
+syntactically correct but drifts in sub-dependency resolution (we hit
+this with `picomatch@4.0.4` three times). `npm ci` rejects it with
+"Missing: X from lock file" and the release workflow fails.
+
+The CI workflow uses `npm install` (not `npm ci`) as a safety net so
+small drifts don't break releases, but the rule is still: full
+`npm install` locally before committing a version bump, so the
+committed lockfile stays the source of truth.
+
+If you ever see CI fail with "Missing: ... from lock file":
+```bash
+rm package-lock.json node_modules -rf
+npm install
+git add package-lock.json
+```
+
 ## Versioning rule (REQUIRED)
 
 Every PR or direct push to `master` that changes runtime code or
