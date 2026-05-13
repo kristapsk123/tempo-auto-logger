@@ -199,30 +199,31 @@ These were agreed with the user; don't relitigate unless they ask:
   hidden via scoped CSS in `Popup.svelte`. The footer shows a running
   total of included, not-yet-posted rows as `Xh Ym` via
   `formatDuration`.
-- **Distribution: self-hosted signed CRX, per-user HKCU policy.**
-  Teammates run `install.ps1` once, which adds an
-  `HKCU\Software\Policies\Google\Chrome\ExtensionInstallForcelist`
+- **Distribution: self-hosted signed CRX, HKLM policy.**
+  Teammates run `install.ps1` once as administrator, which writes an
+  `HKLM\Software\Policies\Google\Chrome\ExtensionInstallForcelist`
   entry pointing to our `updates.xml` on GitHub Pages. Chrome then
   treats it as a managed extension and silently auto-installs (and
   later auto-updates) the signed CRX from
-  `https://kristapsk123.github.io/tempo-auto-logger/`. No admin
-  rights required; no Chrome Web Store; no manual reloads. Extension
-  ID is fixed at `lllmnccgpmaohmachieeindoelkaaood`, derived from the
-  CRX signing key. The signing key (PEM) lives **only** in the
-  `CRX_PRIVATE_KEY` GitHub Actions secret and on Kristaps's local
-  backup — if it's ever lost, we cannot ship updates and would have
-  to re-issue with a new ID + force a re-migration. The notify-only
-  banner (`AvailableUpdate` storage key, popup green banner) is still
-  in place as a defense in depth — if Chrome's auto-update ever
-  silently fails, the popup will still flag that a newer GitHub
-  release exists.
+  `https://kristapsk123.github.io/tempo-auto-logger/`. No Chrome Web
+  Store; no manual reloads. Extension ID is fixed at
+  `lllmnccgpmaohmachieeindoelkaaood`, derived from the CRX signing
+  key. The signing key (PEM) lives **only** in the `CRX_PRIVATE_KEY`
+  GitHub Actions secret and on Kristaps's local backup — if it's
+  ever lost, we cannot ship updates and would have to re-issue with
+  a new ID + force a re-migration. Visma's corporate Chrome already
+  has a Machine-scope `ExtensionInstallForcelist` from group policy;
+  our HKLM entry is appended as a separate numbered slot and the two
+  merge in Chrome at runtime. HKCU is corporate-locked at Visma so
+  the per-user fallback doesn't work — admin elevation is required.
 - **Auto-update cadence:** the service worker fires a `chrome.alarms`
-  every 5 minutes, which (a) checks GitHub releases API for the
-  notify-only banner, and (b) calls
-  `chrome.runtime.requestUpdateCheck()` to force Chrome to poll
-  `updates.xml` immediately instead of waiting its default ~5h.
-  Result: a push to master ships to all teammates within roughly 10
-  minutes end-to-end (Actions build ~3 min + Chrome's next poll cycle).
+  every 5 minutes which calls `chrome.runtime.requestUpdateCheck()`
+  to force Chrome to poll `updates.xml` immediately instead of
+  waiting its default ~5h. Result: a push to master ships to all
+  teammates within roughly 10 minutes end-to-end (Actions build
+  ~3 min + Chrome's next poll cycle). The popup title shows a small
+  `vX.Y.Z` badge so teammates can visually confirm which build is
+  running.
 - **Captcha gate (suspected-bot users):** the popup blocks its main UI
   behind a math captcha for any user that is suspected to be a
   bot/robot/not a human. Bot identification is work in progress, so it
