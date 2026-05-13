@@ -11,7 +11,14 @@ const KEYS = {
   USER_TEMPLATES: 'userDescriptionTemplates',
   FALLBACK_COMMIT_JIRA: 'fallbackCommitJira',
   NEON_THEME: 'neonTheme',
+  AVAILABLE_UPDATE: 'availableUpdate',
 } as const;
+
+export type AvailableUpdate = {
+  version: string;
+  htmlUrl: string;
+  checkedAt: number;
+};
 
 export const DEFAULT_ATTENDANCE_FILTER: AttendanceFilter = 'all-except-declined';
 
@@ -123,6 +130,31 @@ export async function getNeonTheme(): Promise<boolean> {
 
 export async function setNeonTheme(enabled: boolean): Promise<void> {
   await chrome.storage.local.set({ [KEYS.NEON_THEME]: enabled });
+}
+
+export async function getAvailableUpdate(): Promise<AvailableUpdate | null> {
+  const result = await chrome.storage.local.get(KEYS.AVAILABLE_UPDATE);
+  const value = result[KEYS.AVAILABLE_UPDATE];
+  if (
+    value &&
+    typeof value === 'object' &&
+    typeof (value as AvailableUpdate).version === 'string' &&
+    typeof (value as AvailableUpdate).htmlUrl === 'string' &&
+    typeof (value as AvailableUpdate).checkedAt === 'number'
+  ) {
+    return value as AvailableUpdate;
+  }
+  return null;
+}
+
+export async function setAvailableUpdate(
+  update: AvailableUpdate,
+): Promise<void> {
+  await chrome.storage.local.set({ [KEYS.AVAILABLE_UPDATE]: update });
+}
+
+export async function clearAvailableUpdate(): Promise<void> {
+  await chrome.storage.local.remove(KEYS.AVAILABLE_UPDATE);
 }
 
 // --- Session storage: popup state within a single browser session ---

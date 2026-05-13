@@ -7,3 +7,9 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+.claude/
+.pptx-work-unpacked/
+.presentation/
+*.zip
+pages/
+*.pem

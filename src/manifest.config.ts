@@ -7,6 +7,8 @@ export default defineManifest({
   description:
     'Auto-logs time to Jira Tempo from GitHub activity and Google Calendar meetings',
   version: pkg.version,
+  update_url:
+    'https://kristapsk123.github.io/tempo-auto-logger/updates.xml',
   action: {
     default_title: 'Tempo Auto Logger',
   },
@@ -15,7 +17,7 @@ export default defineManifest({
     service_worker: 'src/background/service-worker.ts',
     type: 'module',
   },
-  permissions: ['storage'],
+  permissions: ['storage', 'alarms'],
   host_permissions: [
     'https://jira.visma.com/*',
     'https://calendar.google.com/*',
