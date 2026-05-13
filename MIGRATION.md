@@ -4,8 +4,10 @@ We're switching how Tempo Auto Logger is installed. After this
 one-time migration, you'll never have to manually update again —
 Chrome silently pulls new versions in the background.
 
-**Estimated time:** ~5 minutes. Do this on each machine where you've
-loaded the extension.
+**Estimated time:** ~5 minutes of your active attention. Chrome may
+take an extra couple of minutes to install the extension after the
+restart in step 3 — you can keep doing other things in the meantime.
+Do this on each machine where you've loaded the extension.
 
 **You'll need local admin rights on the machine.** The installer
 script auto-elevates via a UAC prompt — you click *Yes* once. Without
