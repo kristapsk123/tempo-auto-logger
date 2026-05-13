@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Read version
+        id: ver
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if tag already exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists. Bump package.json version before merging to master."
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump package.json version before merging to master."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+
+      - name: Package dist
+        run: cd dist && zip -r ../dist.zip .
+
+      - name: Build signed CRX + updates.xml
+        env:
+          CRX_PRIVATE_KEY: ${{ secrets.CRX_PRIVATE_KEY }}
+        run: npm run build:crx
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          NOTES=$(git log -1 --pretty=%B)
+          gh release create "$TAG" dist.zip pages/tempo-auto-logger.crx --title "$TAG" --notes "$NOTES"
+
+      - name: Publish CRX + updates.xml to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages
+          publish_branch: gh-pages
+          force_orphan: true

@@ -123,6 +123,24 @@ src/
 team-defaults.json           Shared across repo: default meeting
                              mappings, templates, default minutes
 github-orgs.json             Shared across repo: which GH orgs to scan
+scripts/
+  build-crx.mjs              Signs a CRX3 from dist/ using
+                             CRX_PRIVATE_KEY env var; emits
+                             pages/tempo-auto-logger.crx and
+                             pages/updates.xml. Fails loudly if the
+                             key produces a different extension ID
+                             than the pinned one.
+install.ps1                  Per-user HKCU policy installer
+                             teammates run once to opt into silent
+                             auto-updates from GitHub Pages.
+uninstall.ps1                Reverse of install.ps1.
+MIGRATION.md                 One-time DevTools export/import dance for
+                             teammates moving from the old unpacked
+                             install to the policy-installed CRX.
+.github/workflows/
+  release.yml                On push to master: bump check, build,
+                             sign CRX, gh release create, publish CRX
+                             + updates.xml to gh-pages branch.
 ```
 
 ## Locked design decisions
@@ -181,8 +199,30 @@ These were agreed with the user; don't relitigate unless they ask:
   hidden via scoped CSS in `Popup.svelte`. The footer shows a running
   total of included, not-yet-posted rows as `Xh Ym` via
   `formatDuration`.
-- **Distribution:** unpacked extension from this git repo. `npm run
-  build`, load `dist/` at `chrome://extensions`.
+- **Distribution: self-hosted signed CRX, per-user HKCU policy.**
+  Teammates run `install.ps1` once, which adds an
+  `HKCU\Software\Policies\Google\Chrome\ExtensionInstallForcelist`
+  entry pointing to our `updates.xml` on GitHub Pages. Chrome then
+  treats it as a managed extension and silently auto-installs (and
+  later auto-updates) the signed CRX from
+  `https://kristapsk123.github.io/tempo-auto-logger/`. No admin
+  rights required; no Chrome Web Store; no manual reloads. Extension
+  ID is fixed at `lllmnccgpmaohmachieeindoelkaaood`, derived from the
+  CRX signing key. The signing key (PEM) lives **only** in the
+  `CRX_PRIVATE_KEY` GitHub Actions secret and on Kristaps's local
+  backup — if it's ever lost, we cannot ship updates and would have
+  to re-issue with a new ID + force a re-migration. The notify-only
+  banner (`AvailableUpdate` storage key, popup green banner) is still
+  in place as a defense in depth — if Chrome's auto-update ever
+  silently fails, the popup will still flag that a newer GitHub
+  release exists.
+- **Auto-update cadence:** the service worker fires a `chrome.alarms`
+  every 5 minutes, which (a) checks GitHub releases API for the
+  notify-only banner, and (b) calls
+  `chrome.runtime.requestUpdateCheck()` to force Chrome to poll
+  `updates.xml` immediately instead of waiting its default ~5h.
+  Result: a push to master ships to all teammates within roughly 10
+  minutes end-to-end (Actions build ~3 min + Chrome's next poll cycle).
 - **Captcha gate (suspected-bot users):** the popup blocks its main UI
   behind a math captcha for any user that is suspected to be a
   bot/robot/not a human. Bot identification is work in progress, so it
@@ -248,6 +288,25 @@ After any meaningful change, ensure build + check pass, commit with a
 descriptive message (Co-Authored-By: Claude trailer per house style),
 push to `origin/master`.
 
+## Versioning rule (REQUIRED)
+
+Every PR or direct push to `master` that changes runtime code or
+assets MUST bump the `version` field in `package.json` — patch
+(`0.1.0` → `0.1.1`) for bug fixes, minor (`0.1.0` → `0.2.0`) for new
+features. The manifest version is derived from `package.json` at
+build time in [src/manifest.config.ts](src/manifest.config.ts:9), so
+`package.json` is the single source of truth.
+
+This is enforced by [.github/workflows/release.yml](.github/workflows/release.yml):
+on push to master, if a release tag `v{version}` already exists the
+workflow fails with a clear error. On success it builds, zips `dist/`,
+and creates a GitHub Release with `dist.zip` attached.
+
+The popup's update notifier polls GitHub releases every 5 min — if
+the version isn't bumped, teammates won't see that anything changed.
+**This applies to Claude-authored PRs too:** any automated issue-fix
+flow must bump the version as part of the same commit.
+
 ## Keeping this file current
 
 This file is the single source of truth for any AI session working on this
@@ -267,7 +326,9 @@ Concretely, update CLAUDE.md when you:
 
 ## Remote
 
-`https://github.com/kristapsk123/tempo-auto-logger` — private.
+`https://github.com/kristapsk123/tempo-auto-logger` — public (was
+private; flipped public on 2026-05-13 so GitHub Pages could host the
+signed CRX + `updates.xml` on the free plan).
 
 ## Things deliberately NOT done yet
 

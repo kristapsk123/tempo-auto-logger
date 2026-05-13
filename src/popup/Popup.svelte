@@ -18,6 +18,8 @@
     setSessionPopupDates,
     setSessionUnmappedInputs,
     clearSessionUnmappedInputs,
+    getAvailableUpdate,
+    type AvailableUpdate,
     type UnmappedInputCache,
   } from '../lib/storage';
   import type { WorklogEntry } from '../lib/aggregator';
@@ -53,6 +55,8 @@
   // null = not-yet-decided, true = blocking, false = passed / not required
   let captchaRequired = $state<boolean | null>(null);
   let hasPat = $state<boolean | null>(null); // null = loading
+  let availableUpdate = $state<AvailableUpdate | null>(null);
+  const currentVersion = chrome.runtime.getManifest().version;
   let dateFrom = $state(isoDate(-1));
   let dateTo = $state(isoDate(-1));
   let sessionUnmappedInputs = $state<UnmappedInputCache>({});
@@ -86,6 +90,17 @@
       sessionUnmappedInputs = savedInputs;
       theme.neon = neon;
       applyThemeClass(neon);
+      availableUpdate = await getAvailableUpdate();
+      try {
+        chrome.runtime.sendMessage({ type: 'check-update-now' }, () => {
+          // sendResponse callback fires when SW finishes; pick up the result.
+          void getAvailableUpdate().then((u) => {
+            availableUpdate = u;
+          });
+        });
+      } catch {
+        // SW may be cold-starting; alarm will catch up.
+      }
 
       try {
         const me = await getMyself();
@@ -111,6 +126,26 @@
         captchaRequired = false;
       }
     })();
+  });
+
+  $effect(() => {
+    const listener = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      area: string,
+    ) => {
+      if (area === 'local' && 'availableUpdate' in changes) {
+        const next = changes.availableUpdate.newValue;
+        availableUpdate =
+          next &&
+          typeof next === 'object' &&
+          typeof next.version === 'string' &&
+          typeof next.htmlUrl === 'string'
+            ? (next as AvailableUpdate)
+            : null;
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
   });
 
   async function handleCaptchaPass(): Promise<void> {
@@ -553,6 +588,21 @@
   </header>
 
   {#if hasPat !== null}
+    {#if availableUpdate && availableUpdate.version !== currentVersion}
+      <div class="mb-2 px-2.5 py-1.5 {n('bg-neon-green-bg border border-neon-green text-neon-green', 'bg-emerald-50 border border-emerald-200 text-emerald-900')} rounded text-[11px] flex items-center justify-between gap-2">
+        <span>
+          <span class="font-medium">Update available: v{availableUpdate.version}</span>
+          — you have v{currentVersion}. Download the new dist.zip, replace your
+          unpacked folder contents, then reload at chrome://extensions.
+        </span>
+        <button
+          class="shrink-0 {n('text-neon-cyan', 'text-emerald-700')} hover:underline"
+          onclick={() => chrome.tabs.create({ url: availableUpdate!.htmlUrl })}
+        >
+          View release
+        </button>
+      </div>
+    {/if}
     {#if hasPat === false}
       <div class="mb-2 px-2.5 py-1.5 {n('bg-neon-blue-bg border border-neon-blue text-neon-blue', 'bg-sky-50 border border-sky-200 text-sky-900')} rounded text-[11px] flex items-center justify-between gap-2">
         <span>
