@@ -112,6 +112,44 @@ jobs:
               (e.g. `claude/issue-${ISSUE_NUMBER}-followup-<timestamp>`)
               off master.
 
+            STEP 2.5 — Rebase / conflict resolution path
+            If the comment is asking you to rebase, resolve merge
+            conflicts, fix the lockfile, or pull in latest master
+            (phrases like "rebase", "resolve conflicts", "fix
+            conflicts", "update branch", "merge master"):
+
+              1. Make sure you ran STEP 2 first (you must be on the PR
+                 branch). This path only applies when IS_PR == "true".
+              2. Fetch and rebase:
+                 `git fetch origin master && git rebase origin/master`
+              3. If git reports a conflict in `package-lock.json`,
+                 follow CLAUDE.md's "Lockfile rule" exactly:
+                 `rm package-lock.json`,
+                 `npm install`,
+                 `git add package-lock.json`,
+                 `git rebase --continue`.
+              4. If git reports a conflict in `package.json` on the
+                 `version` field, take the **higher** of the two
+                 versions and continue the rebase.
+              5. For any other conflict in source files (`src/**`,
+                 workflows, docs), resolve by understanding the intent
+                 of both sides. Do NOT just pick one side blindly. If
+                 the resolution is non-obvious, post a comment
+                 explaining what's ambiguous and stop without pushing.
+              6. After a clean rebase, run `npm run check`. It must
+                 pass with 0 errors and 0 warnings.
+              7. Push with `git push --force-with-lease` (NOT
+                 `--force`). If `--force-with-lease` is rejected,
+                 stop and post a comment — someone else pushed to the
+                 branch concurrently.
+              8. Sign off per STEP 5 with one comment confirming the
+                 rebase landed and the PR is mergeable again.
+
+              **Do not also make code changes in the same run.** If
+              the comment asks for both ("rebase and also add X"),
+              do the rebase first as its own commit, push, then
+              continue with the code change in a separate commit.
+
             STEP 3 — Decide if you can fulfil the request
             If the request is too vague, ambiguous, or needs info you don't
             have, post a clarifying-questions comment with `gh` and stop.
