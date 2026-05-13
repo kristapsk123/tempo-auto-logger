@@ -20,12 +20,18 @@ jobs:
     # in passing.
     # We bypass the action's built-in trigger regex by passing `prompt:`
     # below — when prompt is set, the action always triggers.
+    # Skip comments from bot accounts to avoid infinite loops — Claude's
+    # own "Claude Code is working…" progress comment contains the word
+    # "claude" and would re-trigger this workflow otherwise.
     if: |
       (github.event_name == 'issue_comment' &&
+        github.event.comment.user.type != 'Bot' &&
         contains(github.event.comment.body, 'claude')) ||
       (github.event_name == 'pull_request_review_comment' &&
+        github.event.comment.user.type != 'Bot' &&
         contains(github.event.comment.body, 'claude')) ||
       (github.event_name == 'pull_request_review' &&
+        github.event.review.user.type != 'Bot' &&
         contains(github.event.review.body, 'claude'))
     runs-on: ubuntu-latest
     permissions:
