@@ -356,8 +356,6 @@ signed CRX + `updates.xml` on the free plan).
 ## Things deliberately NOT done yet
 
 - Onboarding wizard (install-triggered full-page walkthrough)
-- Custom icons (uses Chrome's default puzzle-piece)
-- Custom date range picker in popup (only yesterday / today quick buttons)
 - Retry button for failed post entries (just shows red ✗ with tooltip)
 - Persisting manual entries across popup opens (they currently live in
   in-memory state and are gone after a reload — explicitly agreed that's
