@@ -554,7 +554,10 @@
 <main class="p-4 min-w-[38.25rem] min-h-[360px] w-full max-w-[1280px] mx-auto font-sans flex flex-col {n('bg-retro-bg retro-grid', 'bg-gray-50')}">
   <header class="flex items-start justify-between mb-3">
     <div>
-      <h1 class="text-lg font-semibold {n('retro-glow-text', 'text-gray-900')}">Tempo Auto Logger</h1>
+      <h1 class="text-lg font-semibold {n('retro-glow-text', 'text-gray-900')}">
+        Tempo Auto Logger
+        <span class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted', 'text-gray-400')}">v{currentVersion}</span>
+      </h1>
       <p class="text-xs {n('text-retro-muted', 'text-gray-500')} mt-0.5">
         Log commits, reviews and meetings to Tempo
       </p>
