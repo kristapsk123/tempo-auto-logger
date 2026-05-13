@@ -176,7 +176,8 @@ entry listed. If not, the installer didn't run as admin — repeat
 Step 1.
 
 **"Jira session expired" error**
-→ Open `jira.visma.com` in a tab and log in again. Retry.
+→ Open `jira.visma.com` in a tab and log in again, then click the
+**Retry** button in the popup.
 
 **"Calendar session expired" error**
 → Open `calendar.google.com` in a tab and make sure you're signed in.
