@@ -123,9 +123,21 @@ jobs:
                 errors and 0 warnings. Iterate until it does.
               - Commit message: neutral tone, short subject. Trailer:
                 `Co-Authored-By: Claude <noreply@anthropic.com>`.
-              - Push to the same branch. Do NOT open a new PR if one
-                already exists for this branch — the existing PR will
-                pick up the new commit automatically.
+              - Push to the branch.
+
+            After pushing:
+              - If IS_PR == "true": don't open a new PR. The existing
+                PR you're commenting on will pick up the new commit
+                automatically.
+              - If IS_PR == "false" (issue comment): open a pull
+                request against master with `gh pr create` — title
+                `fix: <summary>`, body referencing
+                `Fixes #${ISSUE_NUMBER}` and a trailer
+                `Co-Authored-By: Claude <noreply@anthropic.com>`.
+                This is the path for retriggering a failed
+                auto-triage: someone comments on an issue asking
+                you to (re)do the work, you implement, you open
+                the PR. Do NOT merge it yourself.
 
             STEP 5 — Sign off
             Post ONE comment on the PR or issue confirming what you did
