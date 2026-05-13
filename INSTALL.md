@@ -4,8 +4,10 @@ This guide is for teammates who just want to **install and use** the
 extension. You don't need to know git, npm, or anything technical.
 
 > 💡 If you were already using the extension as a manually-loaded
-> unpacked folder, follow [MIGRATION.md](MIGRATION.md) instead — it
-> covers how to switch over without losing your saved settings.
+> unpacked folder (i.e. you ran `npm run build` and used **Load
+> unpacked** at `chrome://extensions`), follow
+> [MIGRATION.md](MIGRATION.md) instead — it covers how to switch over
+> without losing your saved settings.
 
 ## What you'll need
 
