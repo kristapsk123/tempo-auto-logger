@@ -9,8 +9,20 @@ export default defineManifest({
   version: pkg.version,
   update_url:
     'https://kristapsk123.github.io/tempo-auto-logger/updates.xml',
+  icons: {
+    16: 'src/icons/pony16.png',
+    32: 'src/icons/pony32.png',
+    48: 'src/icons/pony48.png',
+    128: 'src/icons/pony128.png',
+  },
   action: {
     default_title: 'Tempo Auto Logger',
+    default_icon: {
+      16: 'src/icons/pony16.png',
+      32: 'src/icons/pony32.png',
+      48: 'src/icons/pony48.png',
+      128: 'src/icons/pony128.png',
+    },
   },
   options_page: 'src/options/index.html',
   background: {
