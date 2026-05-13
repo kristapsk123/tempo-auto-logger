@@ -3,16 +3,19 @@
     DEFAULT_ATTENDANCE_FILTER,
     clearFallbackCommitJira,
     clearGithubToken,
+    clearCustomIcon,
     getAttendanceFilter,
     getFallbackCommitJira,
     getGithubToken,
     getNeonTheme,
+    getCustomIcon,
     getUserMeetingMappings,
     getUserTemplates,
     replaceUserMeetingMappings,
     setAttendanceFilter,
     setFallbackCommitJira,
     setGithubToken,
+    setCustomIcon,
     setUserTemplates,
   } from '../lib/storage';
   import { aggregate } from '../lib/aggregator';
@@ -30,7 +33,7 @@
 
   const teamDefaults = teamDefaultsJson as TeamDefaults;
 
-  type Tab = 'general' | 'meetings' | 'github' | 'templates' | 'about';
+  type Tab = 'general' | 'meetings' | 'github' | 'templates' | 'appearance' | 'about';
   let active = $state<Tab>('general');
 
   const tabs: { id: Tab; label: string }[] = [
@@ -38,6 +41,7 @@
     { id: 'meetings', label: 'Meetings' },
     { id: 'github', label: 'GitHub' },
     { id: 'templates', label: 'Templates' },
+    { id: 'appearance', label: 'Appearance' },
     { id: 'about', label: 'About' },
   ];
 
@@ -75,18 +79,24 @@
   });
   let templateSavedFlash = $state(false);
 
+  // Appearance tab
+  let customIconDataUrl = $state<string | null>(null);
+  let iconUploadError = $state('');
+  let iconSavedFlash = $state(false);
+
   // Favorites from Jira (+ previously used) for the picker
   let favorites = $state<JiraIssueOption[]>([]);
 
   $effect(() => {
     void (async () => {
-      const [af, mappings, token, userT, savedFallback, neon] = await Promise.all([
+      const [af, mappings, token, userT, savedFallback, neon, savedIcon] = await Promise.all([
         getAttendanceFilter(),
         getUserMeetingMappings(),
         getGithubToken(),
         getUserTemplates(),
         getFallbackCommitJira(),
         getNeonTheme(),
+        getCustomIcon(),
       ]);
       attendanceFilter = af;
       userMappings = mappings.map((m) => ({
@@ -113,6 +123,7 @@
       };
       theme.neon = neon;
       applyThemeClass(neon);
+      customIconDataUrl = savedIcon;
 
       // Non-critical: fetch favorites for the Jira picker
       loadFavorites()
@@ -248,6 +259,36 @@
       ...templateInputs,
       [key]: teamDefaults.descriptionTemplates[key],
     };
+  }
+
+  const MAX_ICON_BYTES = 2 * 1024 * 1024; // 2 MB
+
+  function handleIconFileChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    iconUploadError = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      iconUploadError = 'Please choose an image file.';
+      return;
+    }
+    if (file.size > MAX_ICON_BYTES) {
+      iconUploadError = 'Image must be smaller than 2 MB.';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      await setCustomIcon(dataUrl);
+      customIconDataUrl = dataUrl;
+      flash((v) => (iconSavedFlash = v));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function removeCustomIcon() {
+    await clearCustomIcon();
+    customIconDataUrl = null;
   }
 
   // Live template preview — simulate a fake entry to show what the comment would look like
@@ -672,6 +713,65 @@
             {#if templateSavedFlash}
               <span class="{n('text-neon-green', 'text-green-700')} text-sm">Saved ✓</span>
             {/if}
+          </div>
+        {:else if active === 'appearance'}
+          <h2 class="{n('text-retro-bright neon-text-cyan', 'text-gray-900')} text-lg font-medium mb-4">Appearance</h2>
+
+          <div class="space-y-6">
+            <div>
+              <h3 class="{n('text-retro-bright', 'text-gray-900')} text-sm font-medium mb-1">
+                Extension icon
+              </h3>
+              <p class="{n('text-retro-muted', 'text-gray-600')} text-xs mb-3">
+                Replace the toolbar icon with your own image. PNG or SVG recommended;
+                must be under 2 MB. The icon is stored locally on this device.
+              </p>
+
+              <div class="flex items-center gap-4 mb-3">
+                <div class="{n('bg-retro-surface2 border-retro-border2', 'bg-gray-100 border-gray-300')} border rounded p-2 flex-shrink-0">
+                  {#if customIconDataUrl}
+                    <img src={customIconDataUrl} alt="Custom extension icon" class="w-10 h-10 object-contain" />
+                  {:else}
+                    <img src="../../src/icons/pony48.png" alt="Default extension icon" class="w-10 h-10 object-contain" />
+                  {/if}
+                </div>
+                <div class="text-xs {n('text-retro-muted', 'text-gray-500')}">
+                  {#if customIconDataUrl}
+                    Custom icon active
+                  {:else}
+                    Default icon (pink pony)
+                  {/if}
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3 flex-wrap">
+                <label
+                  class="{n('border-retro-border2 hover:bg-retro-surface2 text-retro-text', 'border-gray-300 hover:bg-gray-50 text-gray-700')} px-3 py-1.5 border text-sm rounded cursor-pointer"
+                >
+                  {customIconDataUrl ? 'Replace icon' : 'Upload icon'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    class="sr-only"
+                    onchange={handleIconFileChange}
+                  />
+                </label>
+                {#if customIconDataUrl}
+                  <button
+                    class="{n('border-neon-red text-neon-red hover:bg-neon-red-bg', 'border-red-300 text-red-700 hover:bg-red-50')} px-3 py-1.5 border text-sm rounded"
+                    onclick={removeCustomIcon}
+                  >
+                    Remove (reset to default)
+                  </button>
+                {/if}
+                {#if iconSavedFlash}
+                  <span class="{n('text-neon-green', 'text-green-700')} text-sm">Saved ✓</span>
+                {/if}
+              </div>
+              {#if iconUploadError}
+                <p class="text-red-600 text-xs mt-2">{iconUploadError}</p>
+              {/if}
+            </div>
           </div>
         {:else if active === 'about'}
           <h2 class="{n('text-retro-bright neon-text-cyan', 'text-gray-900')} text-lg font-medium mb-3">About</h2>

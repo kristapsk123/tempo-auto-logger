@@ -11,6 +11,7 @@ const KEYS = {
   USER_TEMPLATES: 'userDescriptionTemplates',
   FALLBACK_COMMIT_JIRA: 'fallbackCommitJira',
   NEON_THEME: 'neonTheme',
+  CUSTOM_ICON: 'customIcon',
 } as const;
 
 export const DEFAULT_ATTENDANCE_FILTER: AttendanceFilter = 'all-except-declined';
@@ -123,6 +124,20 @@ export async function getNeonTheme(): Promise<boolean> {
 
 export async function setNeonTheme(enabled: boolean): Promise<void> {
   await chrome.storage.local.set({ [KEYS.NEON_THEME]: enabled });
+}
+
+export async function getCustomIcon(): Promise<string | null> {
+  const result = await chrome.storage.local.get(KEYS.CUSTOM_ICON);
+  const value = result[KEYS.CUSTOM_ICON];
+  return typeof value === 'string' && value.startsWith('data:') ? value : null;
+}
+
+export async function setCustomIcon(dataUrl: string): Promise<void> {
+  await chrome.storage.local.set({ [KEYS.CUSTOM_ICON]: dataUrl });
+}
+
+export async function clearCustomIcon(): Promise<void> {
+  await chrome.storage.local.remove(KEYS.CUSTOM_ICON);
 }
 
 // --- Session storage: popup state within a single browser session ---
