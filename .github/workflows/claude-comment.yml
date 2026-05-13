@@ -39,6 +39,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Make all remote branches available locally so `git checkout
+      # <pr-branch>` inside the action works for PR comments.
+      # Without this, the action fails with
+      # "Command failed: git checkout <branch> --" because checkout@v4
+      # only brings down the current ref's history.
+      - run: git fetch --all
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
