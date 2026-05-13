@@ -2,7 +2,7 @@ name: Auto-triage issues
 
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened]
 
 concurrency:
   group: auto-triage-${{ github.event.issue.number }}
@@ -18,20 +18,6 @@ jobs:
       id-token: write
 
     steps:
-      # anthropics/claude-code-action@v1 hardcodes a list of supported
-      # issue actions and rejects "reopened" with
-      # "Unsupported issue action: reopened". Workaround: rewrite the
-      # event payload to claim action: opened, then point the action
-      # at the rewritten file via GITHUB_EVENT_PATH. Lets us re-trigger
-      # the triage by close+reopen instead of forcing the reporter to
-      # delete and recreate the issue.
-      - name: Normalize reopened to opened
-        if: github.event.action == 'reopened'
-        run: |
-          NORMALIZED="$RUNNER_TEMP/event-normalized.json"
-          jq '.action = "opened"' "$GITHUB_EVENT_PATH" > "$NORMALIZED"
-          echo "GITHUB_EVENT_PATH=$NORMALIZED" >> "$GITHUB_ENV"
-
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
