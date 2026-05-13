@@ -63,7 +63,15 @@ jobs:
 
       # npm install (not npm ci) to tolerate small lockfile drifts.
       # See CLAUDE.md "Lockfile rule".
-      - run: npm install
+      # We then immediately reset any lockfile drift from npm install
+      # itself so the action can git-checkout a PR branch without git
+      # complaining about uncommitted changes. (npm install often
+      # touches package-lock.json even when there's nothing real to
+      # change.) node_modules/ is gitignored so it stays put.
+      - run: |
+          npm install
+          git checkout -- .
+          git clean -fd -- ':!node_modules'
 
       - name: Configure git identity
         run: |
