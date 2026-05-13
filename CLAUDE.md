@@ -326,7 +326,9 @@ Concretely, update CLAUDE.md when you:
 
 ## Remote
 
-`https://github.com/kristapsk123/tempo-auto-logger` — private.
+`https://github.com/kristapsk123/tempo-auto-logger` — public (was
+private; flipped public on 2026-05-13 so GitHub Pages could host the
+signed CRX + `updates.xml` on the free plan).
 
 ## Things deliberately NOT done yet
 
