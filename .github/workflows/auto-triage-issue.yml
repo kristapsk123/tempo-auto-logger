@@ -2,7 +2,7 @@ name: Auto-triage issues
 
 on:
   issues:
-    types: [opened]
+    types: [opened, reopened]
 
 concurrency:
   group: auto-triage-${{ github.event.issue.number }}
