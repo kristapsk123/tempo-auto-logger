@@ -43,7 +43,9 @@ jobs:
             exit 1
           fi
 
-      - run: npm ci
+      # npm install (not npm ci) so the workflow tolerates small lockfile
+      # drifts after a version bump. See CLAUDE.md "Lockfile rule".
+      - run: npm install
       - run: npm run check
       - run: npm run build
 
@@ -60,8 +62,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.ver.outputs.tag }}
         run: |
-          NOTES=$(git log -1 --pretty=%B)
-          gh release create "$TAG" dist.zip pages/tempo-auto-logger.crx --title "$TAG" --notes "$NOTES"
+          # --generate-notes builds a standard "What's Changed" section
+          # listing all PRs merged since the previous release, with
+          # contributors and a Full Changelog link. This is what each
+          # teammate sees when they click through from the release page.
+          gh release create "$TAG" dist.zip pages/tempo-auto-logger.crx \
+            --title "$TAG" \
+            --generate-notes
 
       - name: Publish CRX + updates.xml to gh-pages
         uses: peaceiris/actions-gh-pages@v4

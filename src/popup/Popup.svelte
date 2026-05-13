@@ -54,6 +54,31 @@
   let captchaRequired = $state<boolean | null>(null);
   let hasPat = $state<boolean | null>(null); // null = loading
   const currentVersion = chrome.runtime.getManifest().version;
+  let updateCheckStatus = $state<
+    'idle' | 'checking' | 'no_update' | 'update_available' | 'throttled' | 'error'
+  >('idle');
+  let updateCheckStatusTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function checkForUpdates(): void {
+    updateCheckStatus = 'checking';
+    if (updateCheckStatusTimer) clearTimeout(updateCheckStatusTimer);
+    try {
+      chrome.runtime.requestUpdateCheck((status) => {
+        if (status === 'update_available') updateCheckStatus = 'update_available';
+        else if (status === 'no_update') updateCheckStatus = 'no_update';
+        else if (status === 'throttled') updateCheckStatus = 'throttled';
+        else updateCheckStatus = 'error';
+        updateCheckStatusTimer = setTimeout(() => {
+          updateCheckStatus = 'idle';
+        }, 4000);
+      });
+    } catch {
+      updateCheckStatus = 'error';
+      updateCheckStatusTimer = setTimeout(() => {
+        updateCheckStatus = 'idle';
+      }, 4000);
+    }
+  }
   let dateFrom = $state(isoDate(-1));
   let dateTo = $state(isoDate(-1));
   let sessionUnmappedInputs = $state<UnmappedInputCache>({});
@@ -522,7 +547,30 @@
     <div>
       <h1 class="text-lg font-semibold {n('retro-glow-text', 'text-gray-900')}">
         Tempo Auto Logger
-        <span class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted', 'text-gray-400')}">v{currentVersion}</span>
+        <button
+          type="button"
+          class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted hover:text-neon-cyan', 'text-gray-400 hover:text-blue-600')} hover:underline cursor-pointer"
+          onclick={checkForUpdates}
+          title="Check for updates"
+          disabled={updateCheckStatus === 'checking'}
+        >
+          v{currentVersion}
+        </button>
+        {#if updateCheckStatus !== 'idle'}
+          <span class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted', 'text-gray-500')}">
+            {#if updateCheckStatus === 'checking'}
+              checking…
+            {:else if updateCheckStatus === 'no_update'}
+              ✓ up to date
+            {:else if updateCheckStatus === 'update_available'}
+              ↻ installing — restart Chrome to apply
+            {:else if updateCheckStatus === 'throttled'}
+              throttled, try again in a minute
+            {:else}
+              check failed
+            {/if}
+          </span>
+        {/if}
       </h1>
       <p class="text-xs {n('text-retro-muted', 'text-gray-500')} mt-0.5">
         Log commits, reviews and meetings to Tempo
