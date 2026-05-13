@@ -47,10 +47,14 @@ jobs:
 
       # Make all remote branches available locally so `git checkout
       # <pr-branch>` inside the action works for PR comments.
-      # Without this, the action fails with
-      # "Command failed: git checkout <branch> --" because checkout@v4
-      # only brings down the current ref's history.
-      - run: git fetch --all
+      # actions/checkout@v4 narrows the remote's fetch refspec to just
+      # the target ref (master), so a plain `git fetch --all` only
+      # re-fetches master. We widen the refspec back to all branches
+      # explicitly, then fetch.
+      - run: |
+          git config --unset-all remote.origin.fetch || true
+          git config --add remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+          git fetch origin
 
       - uses: actions/setup-node@v4
         with:
