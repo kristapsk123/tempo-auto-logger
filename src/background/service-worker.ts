@@ -1,51 +1,44 @@
-import { checkForUpdate } from '../lib/update-check';
-
 const POPUP_URL = 'src/popup/index.html';
 const POPUP_WINDOW_KEY = 'popupWindowId';
 const UPDATE_ALARM = 'checkUpdate';
 const UPDATE_PERIOD_MIN = 5;
+
+// Force Chrome to poll our self-hosted updates.xml now instead of waiting
+// its default ~5h cadence. Only meaningful when the extension is installed
+// via the ExtensionInstallForcelist policy from the CRX (see install.ps1);
+// harmless during unpacked development.
+function pokeUpdateCheck(): void {
+  try {
+    chrome.runtime.requestUpdateCheck?.((status) => {
+      console.log('[tempo-auto-logger] update check', status);
+    });
+  } catch {
+    // requestUpdateCheck isn't available in all contexts; ignore.
+  }
+}
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     console.log('[tempo-auto-logger] Installed');
   }
   chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: UPDATE_PERIOD_MIN });
-  void checkForUpdate();
+  pokeUpdateCheck();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: UPDATE_PERIOD_MIN });
-  void checkForUpdate();
+  pokeUpdateCheck();
 });
 
 chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: UPDATE_PERIOD_MIN });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === UPDATE_ALARM) {
-    void checkForUpdate();
-    // Force Chrome to poll the self-hosted updates.xml now instead of
-    // waiting its default ~5h cadence. Only meaningful when the
-    // extension is installed via policy from the CRX; harmless during
-    // unpacked development.
-    try {
-      chrome.runtime.requestUpdateCheck?.((status) => {
-        console.log('[tempo-auto-logger] update check', status);
-      });
-    } catch {
-      // requestUpdateCheck isn't available in all contexts; ignore.
-    }
+    pokeUpdateCheck();
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message && message.type === 'check-update-now') {
-    void checkForUpdate().then(() => sendResponse({ ok: true }));
-    return true;
-  }
-  return false;
-});
-
-void checkForUpdate();
+pokeUpdateCheck();
 
 chrome.action.onClicked.addListener(async () => {
   const stored = await chrome.storage.session.get(POPUP_WINDOW_KEY);
