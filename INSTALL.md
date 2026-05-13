@@ -14,7 +14,7 @@ extension. You don't need to know git, npm, or anything technical.
 - Google Chrome
 - Local admin rights on your machine (the script auto-elevates via
   UAC — you click *Yes* once)
-- About 2 minutes
+- About 2–3 minutes
 - You already log in to Jira (`jira.visma.com`) and Google Calendar in
   this browser
 - **Optional:** a GitHub personal access token — only needed if you
