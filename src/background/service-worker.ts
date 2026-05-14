@@ -92,6 +92,10 @@ pokeUpdateCheck();
 void applyCustomIcon();
 
 chrome.action.onClicked.addListener(async () => {
+  // Ensure the custom icon is applied before the window is created so Windows
+  // captures the correct taskbar icon (action icon) at creation time.
+  await applyCustomIcon();
+
   const stored = await chrome.storage.session.get(POPUP_WINDOW_KEY);
   const existingId: number | undefined = stored[POPUP_WINDOW_KEY];
 
