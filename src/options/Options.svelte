@@ -17,6 +17,8 @@
     setGithubToken,
     setCustomIcon,
     setUserTemplates,
+    exportAllSettings,
+    importAllSettings,
   } from '../lib/storage';
   import { aggregate } from '../lib/aggregator';
   import { loadFavorites, type JiraIssueOption } from '../lib/orchestrator';
@@ -83,6 +85,10 @@
   let customIconDataUrl = $state<string | null>(null);
   let iconUploadError = $state('');
   let iconSavedFlash = $state(false);
+
+  // Export / import
+  let importError = $state('');
+  let importedFlash = $state(false);
 
   // Favorites from Jira (+ previously used) for the picker
   let favorites = $state<JiraIssueOption[]>([]);
@@ -291,6 +297,42 @@
     customIconDataUrl = null;
   }
 
+  async function handleExportSettings() {
+    const data = await exportAllSettings();
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tempo-auto-logger-settings-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportFile(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    importError = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const parsed: unknown = JSON.parse(reader.result as string);
+        if (!confirm('This will replace all current settings. Continue?')) {
+          input.value = '';
+          return;
+        }
+        await importAllSettings(parsed);
+        flash((v) => (importedFlash = v));
+        setTimeout(() => window.location.reload(), 1600);
+      } catch (e) {
+        importError = e instanceof Error ? e.message : 'Failed to import settings.';
+      }
+      input.value = '';
+    };
+    reader.readAsText(file);
+  }
+
   // Live template preview — simulate a fake entry to show what the comment would look like
   const previewSample = $derived.by(() => {
     const fake = aggregate({
@@ -402,6 +444,41 @@
               </button>
               {#if attendanceSavedFlash}
                 <span class="{n('text-neon-green', 'text-green-700')} text-sm">Saved ✓</span>
+              {/if}
+            </div>
+
+            <div class="pt-4 mt-2 {n('border-retro-border', 'border-gray-200')} border-t">
+              <h3 class="{n('text-retro-bright', 'text-gray-900')} text-sm font-medium mb-1">
+                Export / Import settings
+              </h3>
+              <p class="{n('text-retro-muted', 'text-gray-600')} text-xs mb-3">
+                Export all settings to a JSON file to back them up or migrate to another device.
+                Importing replaces all current settings and reloads the page.
+              </p>
+              <div class="flex items-center gap-3 flex-wrap">
+                <button
+                  class="{n('border-retro-border2 hover:bg-retro-surface2 text-retro-text', 'border-gray-300 hover:bg-gray-50 text-gray-700')} px-3 py-1.5 border text-sm rounded"
+                  onclick={handleExportSettings}
+                >
+                  Export settings
+                </button>
+                <label
+                  class="{n('border-retro-border2 hover:bg-retro-surface2 text-retro-text', 'border-gray-300 hover:bg-gray-50 text-gray-700')} px-3 py-1.5 border text-sm rounded cursor-pointer"
+                >
+                  Import settings
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    class="sr-only"
+                    onchange={handleImportFile}
+                  />
+                </label>
+                {#if importedFlash}
+                  <span class="{n('text-neon-green', 'text-green-700')} text-sm">Imported ✓ — reloading…</span>
+                {/if}
+              </div>
+              {#if importError}
+                <p class="text-red-600 text-xs mt-2">{importError}</p>
               {/if}
             </div>
           </div>
