@@ -50,6 +50,11 @@
     saving: boolean;
   };
 
+  type DateGroup = {
+    date: string;
+    groupRows: RowState[];
+  };
+
   // null = not-yet-decided, true = blocking, false = passed / not required
   let captchaRequired = $state<boolean | null>(null);
   let hasPat = $state<boolean | null>(null); // null = loading
@@ -497,6 +502,30 @@
     toPostRows.reduce((sum, r) => sum + (r.entry.minutes || 0), 0),
   );
 
+  let rowsByDate = $derived.by((): DateGroup[] => {
+    const groups = new Map<string, RowState[]>();
+    for (const r of rows) {
+      const d = r.entry.date || '';
+      if (!groups.has(d)) groups.set(d, []);
+      groups.get(d)!.push(r);
+    }
+    return [...groups.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, groupRows]) => ({ date, groupRows }));
+  });
+
+  function formatDateHeader(iso: string): string {
+    if (!iso) return '—';
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  function dayTotalMinutes(groupRows: RowState[]): number {
+    return groupRows
+      .filter((r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok')
+      .reduce((sum, r) => sum + (r.entry.minutes || 0), 0);
+  }
+
   function formatCommitTime(committedAt: string | undefined): string {
     if (!committedAt) return '';
     const d = new Date(committedAt);
@@ -722,7 +751,16 @@
         >
           + Add manual entry
         </button>
-        {#each rows as r (r.entry.id)}
+        {#each rowsByDate as group (group.date)}
+          {#if rowsByDate.length > 1}
+            <div class="flex items-center justify-between px-2 py-1 rounded {n('bg-retro-surface2 text-retro-bright', 'bg-gray-100 text-gray-700')} text-[11px] font-medium">
+              <span>{formatDateHeader(group.date)}</span>
+              {#if dayTotalMinutes(group.groupRows) > 0}
+                <span class="{n('text-neon-cyan', 'text-blue-600')} font-mono">{formatDuration(dayTotalMinutes(group.groupRows))}</span>
+              {/if}
+            </div>
+          {/if}
+          {#each group.groupRows as r (r.entry.id)}
           <div class="border rounded text-xs {rowBg(r)}">
           <div class="flex items-center gap-2 px-2 py-1.5">
             <input
@@ -857,6 +895,7 @@
             </div>
           {/if}
           </div>
+          {/each}
         {/each}
       </div>
 
