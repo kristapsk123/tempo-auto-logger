@@ -140,6 +140,39 @@ export async function clearCustomIcon(): Promise<void> {
   await chrome.storage.local.remove(KEYS.CUSTOM_ICON);
 }
 
+// --- Settings export / import ---
+
+export type ExportedSettings = {
+  version: 1;
+  exportedAt: string;
+  settings: Record<string, unknown>;
+};
+
+export async function exportAllSettings(): Promise<ExportedSettings> {
+  const result = await chrome.storage.local.get(null);
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    settings: result as Record<string, unknown>,
+  };
+}
+
+export async function importAllSettings(data: unknown): Promise<void> {
+  if (
+    typeof data !== 'object' ||
+    data === null ||
+    (data as ExportedSettings).version !== 1 ||
+    typeof (data as ExportedSettings).settings !== 'object' ||
+    (data as ExportedSettings).settings === null ||
+    Array.isArray((data as ExportedSettings).settings)
+  ) {
+    throw new Error('Invalid settings file. Expected a Tempo Auto Logger export.');
+  }
+  const { settings } = data as ExportedSettings;
+  await chrome.storage.local.clear();
+  await chrome.storage.local.set(settings);
+}
+
 // --- Session storage: popup state within a single browser session ---
 
 export type UnmappedInputCache = Record<
