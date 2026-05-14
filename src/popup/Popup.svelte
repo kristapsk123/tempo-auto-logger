@@ -11,6 +11,7 @@
     getGithubToken,
     getNeonTheme,
     setNeonTheme,
+    getCustomIcon,
     getSessionCaptchaPassed,
     getSessionPopupDates,
     getSessionUnmappedInputs,
@@ -58,6 +59,7 @@
   // null = not-yet-decided, true = blocking, false = passed / not required
   let captchaRequired = $state<boolean | null>(null);
   let hasPat = $state<boolean | null>(null); // null = loading
+  let customIconUrl = $state<string>(chrome.runtime.getURL('src/icons/pony48.png'));
   const currentVersion = chrome.runtime.getManifest().version;
   let updateCheckStatus = $state<
     'idle' | 'checking' | 'no_update' | 'update_available' | 'throttled' | 'error'
@@ -103,11 +105,12 @@
 
   $effect(() => {
     void (async () => {
-      const [t, savedDates, savedInputs, neon] = await Promise.all([
+      const [t, savedDates, savedInputs, neon, savedIcon] = await Promise.all([
         getGithubToken(),
         getSessionPopupDates().catch(() => ({ dateFrom: null, dateTo: null })),
         getSessionUnmappedInputs().catch(() => ({} as UnmappedInputCache)),
         getNeonTheme(),
+        getCustomIcon(),
       ]);
       hasPat = !!t;
       if (savedDates.dateFrom && savedDates.dateTo) {
@@ -117,6 +120,7 @@
       sessionUnmappedInputs = savedInputs;
       theme.neon = neon;
       applyThemeClass(neon);
+      if (savedIcon) customIconUrl = savedIcon;
 
       try {
         const me = await getMyself();
@@ -575,7 +579,7 @@
   <header class="flex items-start justify-between mb-3">
     <div>
       <h1 class="text-lg font-semibold {n('retro-glow-text', 'text-gray-900')}">
-        Tempo Auto Logger
+        <img src={customIconUrl} alt="" class="inline-block w-5 h-5 object-contain align-text-bottom mr-1" />Tempo Auto Logger
         <button
           type="button"
           class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted hover:text-neon-cyan', 'text-gray-400 hover:text-blue-600')} hover:underline cursor-pointer"
