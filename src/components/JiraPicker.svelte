@@ -23,11 +23,11 @@
   const baseInputClass = $derived(
     size === 'normal'
       ? theme.neon
-        ? 'w-full px-2 py-1.5 border rounded text-sm font-mono uppercase bg-retro-surface text-retro-text'
-        : 'w-full px-2 py-1.5 border rounded text-sm font-mono uppercase'
+        ? 'w-full px-2 py-1.5 border rounded-lg text-sm font-mono uppercase bg-retro-surface text-retro-text'
+        : 'w-full px-2 py-1.5 border rounded-lg text-sm font-mono uppercase text-slate-800'
       : theme.neon
-        ? 'w-full px-1.5 py-1 border rounded text-[11px] font-mono uppercase bg-retro-surface text-retro-text'
-        : 'w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] font-mono uppercase',
+        ? 'w-full px-1.5 py-1 border rounded-md text-[11px] font-mono uppercase bg-retro-surface text-retro-text'
+        : 'w-full px-1.5 py-1 border border-slate-200 rounded-md text-[11px] font-mono uppercase text-slate-700',
   );
 
   let showDropdown = $state(false);
@@ -114,11 +114,11 @@
     onfocus={openDropdown}
     onblur={closeDropdown}
     {placeholder}
-    class="{baseInputClass} {theme.neon ? 'border-retro-border2 disabled:bg-retro-bg disabled:text-retro-dim' : 'border-gray-300 disabled:bg-gray-100 disabled:text-gray-400'} {inputClass}"
+    class="{baseInputClass} {theme.neon ? 'border-retro-border2 disabled:bg-retro-bg disabled:text-retro-dim' : 'border-slate-200 disabled:bg-slate-50 disabled:text-slate-400'} {inputClass}"
   />
   {#if showDropdown && !disabled && filtered.length > 0 && dropdownPos}
     <div
-      class="fixed z-50 {theme.neon ? 'bg-retro-surface border border-retro-border' : 'bg-white border border-gray-300'} shadow-lg rounded max-h-56 overflow-auto w-[22rem] max-w-[24rem]"
+      class="fixed z-50 {theme.neon ? 'bg-retro-surface border border-retro-border' : 'bg-white border border-slate-200'} shadow-lg rounded-xl max-h-56 overflow-auto w-[22rem] max-w-[24rem]"
       style:top="{dropdownPos.openUp ? 'auto' : dropdownPos.top + 2 + 'px'}"
       style:bottom="{dropdownPos.openUp ? window.innerHeight - dropdownPos.top + 2 + 'px' : 'auto'}"
       style:left="{dropdownPos.left}px"
@@ -130,7 +130,7 @@
           title={fav.isFavorite
             ? `⭐ Favorite — ${fav.summary || fav.key}`
             : fav.summary || fav.key}
-          class="w-full text-left px-2 py-1.5 {theme.neon ? 'hover:bg-retro-surface2 border-b border-retro-border' : 'hover:bg-blue-50 border-b border-gray-100'} flex gap-1.5 items-baseline text-[11px] last:border-0"
+          class="w-full text-left px-2 py-1.5 {theme.neon ? 'hover:bg-retro-surface2 border-b border-retro-border' : 'hover:bg-slate-50 border-b border-slate-100'} flex gap-1.5 items-baseline text-[11px] last:border-0 transition-colors"
           onmousedown={(e) => {
             e.preventDefault();
             pick(fav.key);
@@ -140,7 +140,7 @@
             {#if fav.isFavorite}⭐{/if}
           </span>
           <span class="{theme.neon ? 'text-neon-cyan' : 'text-blue-600'} font-mono shrink-0 w-20">{fav.key}</span>
-          <span class="{theme.neon ? 'text-retro-text' : 'text-gray-700'} truncate flex-1 font-sans">
+          <span class="{theme.neon ? 'text-retro-text' : 'text-slate-600'} truncate flex-1 font-sans">
             {fav.summary || '(no summary)'}
           </span>
         </button>
