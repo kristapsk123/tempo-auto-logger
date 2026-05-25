@@ -118,8 +118,8 @@ export async function clearFallbackCommitJira(): Promise<void> {
 
 export async function getNeonTheme(): Promise<boolean> {
   const result = await chrome.storage.local.get(KEYS.NEON_THEME);
-  // Default to true (neon on) when not yet set
-  return result[KEYS.NEON_THEME] !== false;
+  // Default to false (neon off) when not yet set
+  return result[KEYS.NEON_THEME] === true;
 }
 
 export async function setNeonTheme(enabled: boolean): Promise<void> {
