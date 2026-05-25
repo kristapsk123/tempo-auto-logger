@@ -5,7 +5,7 @@ import { applyThemeClass, theme } from '../lib/theme.svelte';
 import { getNeonTheme, getCustomIcon } from '../lib/storage';
 
 // Read persisted preferences before mount so the first paint matches the
-// user's settings (neon default: on).
+// user's settings (neon default: off).
 const [neonEnabled, customIcon] = await Promise.all([getNeonTheme(), getCustomIcon()]);
 theme.neon = neonEnabled;
 applyThemeClass(neonEnabled);

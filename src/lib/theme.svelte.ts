@@ -1,5 +1,5 @@
 // Shared reactive theme state. Popup writes it; all components read it.
-export const theme = $state({ neon: true });
+export const theme = $state({ neon: false });
 
 // Apply/remove `neon-theme` class on <html> to enable neon global CSS.
 export function applyThemeClass(neon: boolean) {
