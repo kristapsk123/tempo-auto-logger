@@ -476,10 +476,10 @@
       if (source === 'manual') return 'text-neon-purple';
       return 'text-neon-cyan';
     }
-    if (source === 'commit') return 'text-orange-600';
-    if (source === 'review') return 'text-purple-600';
-    if (source === 'manual') return 'text-indigo-600';
-    return 'text-emerald-600';
+    if (source === 'commit') return 'text-orange-500';
+    if (source === 'review') return 'text-purple-500';
+    if (source === 'manual') return 'text-indigo-500';
+    return 'text-emerald-500';
   }
 
   function rowBg(r: RowState): string {
@@ -492,9 +492,9 @@
     }
     if (r.postStatus === 'ok') return 'bg-green-50 border-green-200';
     if (r.postStatus === 'fail') return 'bg-red-50 border-red-200';
-    if (r.postStatus === 'posting') return 'bg-blue-50 border-blue-200';
-    if (r.alreadyLogged) return 'bg-gray-50 border-gray-200 opacity-60';
-    return 'bg-white border-gray-200';
+    if (r.postStatus === 'posting') return 'bg-blue-50 border-blue-100';
+    if (r.alreadyLogged) return 'bg-slate-50 border-slate-100 opacity-60';
+    return 'bg-white border-slate-100';
   }
 
   // Shorthand: picks neon class when neon theme is active, otherwise default
@@ -575,20 +575,20 @@
 </script>
 
 {#if captchaRequired === null}
-  <main class="p-4 min-w-[38.25rem] min-h-[360px] w-full max-w-[1280px] mx-auto font-sans {n('bg-retro-bg retro-grid text-retro-text', 'bg-gray-50 text-slate-600')} text-sm">
+  <main class="p-5 min-w-[38.25rem] min-h-[360px] w-full max-w-[1280px] mx-auto font-sans {n('bg-retro-bg retro-grid text-retro-text', 'bg-white text-slate-600')} text-sm">
     Loading…
   </main>
 {:else if captchaRequired}
   <CaptchaGate onPass={handleCaptchaPass} />
 {:else}
-<main class="p-4 min-w-[38.25rem] min-h-[360px] w-full max-w-[1280px] mx-auto font-sans flex flex-col {n('bg-retro-bg retro-grid', 'bg-gray-50')}">
-  <header class="flex items-start justify-between mb-3">
+<main class="p-5 min-w-[38.25rem] min-h-[360px] w-full max-w-[1280px] mx-auto font-sans flex flex-col {n('bg-retro-bg retro-grid', 'bg-white')}">
+  <header class="flex items-start justify-between mb-4">
     <div>
-      <h1 class="text-lg font-semibold {n('retro-glow-text', 'text-gray-900')}">
+      <h1 class="text-base font-semibold tracking-tight {n('retro-glow-text', 'text-slate-900')}">
         Tempo Auto Logger
         <button
           type="button"
-          class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted hover:text-neon-cyan', 'text-gray-400 hover:text-blue-600')} hover:underline cursor-pointer"
+          class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted hover:text-neon-cyan', 'text-slate-400 hover:text-blue-500 transition-colors')} hover:underline cursor-pointer"
           onclick={checkForUpdates}
           title="Check for updates"
           disabled={updateCheckStatus === 'checking'}
@@ -596,7 +596,7 @@
           v{currentVersion}
         </button>
         {#if updateCheckStatus !== 'idle'}
-          <span class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted', 'text-gray-500')}">
+          <span class="ml-1 align-middle text-[10px] font-normal {n('text-retro-muted', 'text-slate-500')}">
             {#if updateCheckStatus === 'checking'}
               checking…
             {:else if updateCheckStatus === 'no_update'}
@@ -611,15 +611,15 @@
           </span>
         {/if}
       </h1>
-      <p class="text-xs {n('text-retro-muted', 'text-gray-500')} mt-0.5">
+      <p class="text-xs {n('text-retro-muted', 'text-slate-400')} mt-0.5">
         Log commits, reviews and meetings to Tempo
       </p>
     </div>
     <div class="flex items-center gap-2">
       <button
-        class="text-xs px-1.5 py-0.5 rounded border {theme.neon
+        class="text-xs px-2 py-1 rounded-lg border transition-colors {theme.neon
           ? 'border-neon-pink text-neon-pink hover:bg-neon-pink-bg shadow-neon-pink'
-          : 'border-gray-300 text-gray-500 hover:bg-gray-100'}"
+          : 'border-slate-200 text-slate-500 hover:bg-slate-50'}"
         onclick={toggleNeon}
         title={theme.neon ? 'Disable neon theme' : 'Enable neon theme'}
         aria-label="Toggle neon theme"
@@ -627,13 +627,13 @@
         {theme.neon ? 'Neon ON' : 'Neon OFF'}
       </button>
       <button
-        class="text-xs {n('text-neon-cyan', 'text-blue-600')} hover:underline"
+        class="text-xs {n('text-neon-cyan', 'text-blue-600 hover:text-blue-700')} transition-colors hover:underline"
         onclick={() => chrome.runtime.openOptionsPage()}
       >
         Settings
       </button>
       <button
-        class="{n('text-retro-dim hover:text-retro-bright', 'text-gray-400 hover:text-gray-700')} text-base leading-none"
+        class="{n('text-retro-dim hover:text-retro-bright', 'text-slate-400 hover:text-slate-600')} transition-colors text-base leading-none"
         onclick={() => window.close()}
         title="Close"
         aria-label="Close"
@@ -645,20 +645,20 @@
 
   {#if hasPat !== null}
     {#if hasPat === false}
-      <div class="mb-2 px-2.5 py-1.5 {n('bg-neon-blue-bg border border-neon-blue text-neon-blue', 'bg-sky-50 border border-sky-200 text-sky-900')} rounded text-[11px] flex items-center justify-between gap-2">
+      <div class="mb-3 px-3 py-2 {n('bg-neon-blue-bg border border-neon-blue text-neon-blue', 'bg-blue-50 border border-blue-100 text-blue-800')} rounded-lg text-[11px] flex items-center justify-between gap-2">
         <span>
           <span class="font-medium">Meetings-only mode.</span>
           Add a GitHub token in Settings to also log commits and PR reviews.
         </span>
         <button
-          class="shrink-0 {n('text-neon-cyan', 'text-sky-700')} hover:underline"
+          class="shrink-0 {n('text-neon-cyan', 'text-blue-600 hover:text-blue-700')} transition-colors hover:underline"
           onclick={() => chrome.runtime.openOptionsPage()}
         >
           Settings
         </button>
       </div>
     {/if}
-    <div class="space-y-2">
+    <div class="space-y-2.5">
       <div class="flex flex-wrap gap-1.5">
         {#each [
           { label: 'Yesterday', action: presetYesterday },
@@ -668,9 +668,9 @@
           { label: 'Last week', action: presetLastWeek },
         ] as preset (preset.label)}
           <button
-            class="px-2.5 py-1 border text-xs rounded {activePreset === preset.label
-              ? n('border-neon-cyan bg-neon-cyan-bg text-neon-cyan font-medium shadow-neon-cyan', 'border-blue-500 bg-blue-100 text-blue-800 font-medium')
-              : n('border-retro-border2 hover:bg-retro-surface2 bg-retro-surface text-retro-text', 'border-gray-300 hover:bg-gray-100 bg-white')}"
+            class="px-2.5 py-1 border text-xs rounded-lg transition-colors {activePreset === preset.label
+              ? n('border-neon-cyan bg-neon-cyan-bg text-neon-cyan font-medium shadow-neon-cyan', 'border-blue-400 bg-blue-50 text-blue-700 font-medium')
+              : n('border-retro-border2 hover:bg-retro-surface2 bg-retro-surface text-retro-text', 'border-slate-200 hover:bg-slate-50 bg-white text-slate-600')}"
             disabled={loading || posting}
             onclick={preset.action}
           >
@@ -679,32 +679,32 @@
         {/each}
       </div>
 
-      <div class="flex items-center gap-2 text-xs {n('text-retro-text', 'text-gray-700')}">
-        <label class="flex items-center gap-1">
-          From
+      <div class="flex items-center gap-3 text-xs {n('text-retro-text', 'text-slate-600')}">
+        <label class="flex items-center gap-1.5">
+          <span class="text-slate-500">From</span>
           <input
             type="date"
             value={dateFrom}
             onchange={(e) => handleDateFromChange((e.currentTarget as HTMLInputElement).value)}
-            class="px-1.5 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-gray-300 bg-white')} rounded"
+            class="px-2 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-slate-200 bg-white text-slate-700')} rounded-lg transition-colors"
           />
         </label>
-        <label class="flex items-center gap-1">
-          To
+        <label class="flex items-center gap-1.5">
+          <span class="text-slate-500">To</span>
           <input
             type="date"
             bind:value={dateTo}
-            class="px-1.5 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-gray-300 bg-white')} rounded"
+            class="px-2 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-slate-200 bg-white text-slate-700')} rounded-lg transition-colors"
           />
         </label>
       </div>
 
       {#if rangeError}
-        <div class="text-xs {n('text-neon-red', 'text-red-700')}">{rangeError}</div>
+        <div class="text-xs {n('text-neon-red', 'text-red-600')}">{rangeError}</div>
       {/if}
 
       <button
-        class="w-full px-3 py-2 {n('bg-neon-pink hover:bg-neon-pink-dark disabled:bg-retro-border2 disabled:shadow-none shadow-neon-pink', 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300')} text-white text-sm rounded disabled:cursor-not-allowed font-medium"
+        class="w-full px-3 py-2 {n('bg-neon-pink hover:bg-neon-pink-dark disabled:bg-retro-border2 disabled:shadow-none shadow-neon-pink', 'bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400')} text-white text-sm rounded-lg disabled:cursor-not-allowed font-medium transition-colors"
         disabled={loading || posting || rangeError !== null}
         onclick={() => load(dateFrom, dateTo)}
       >
@@ -714,18 +714,18 @@
   {/if}
 
   {#if loadError}
-    <div class="mt-3 p-2.5 {n('bg-neon-red-bg border border-neon-red text-neon-red', 'bg-red-50 border border-red-200 text-red-800')} rounded text-xs">
+    <div class="mt-3 p-3 {n('bg-neon-red-bg border border-neon-red text-neon-red', 'bg-red-50 border border-red-100 text-red-700')} rounded-lg text-xs">
       <div class="font-medium mb-1">⚠ {loadError}</div>
       {#if loadErrorService === 'jira'}
         <button
-          class="mt-1 px-2 py-1 border {n('border-neon-red-dark hover:bg-neon-red-bg text-neon-red', 'border-red-300 hover:bg-red-100')} rounded text-xs"
+          class="mt-1 px-2.5 py-1 border {n('border-neon-red-dark hover:bg-neon-red-bg text-neon-red', 'border-red-200 hover:bg-red-100 text-red-700')} rounded-lg text-xs transition-colors"
           onclick={openJira}
         >
           Open Jira to log in
         </button>
       {:else if loadErrorService === 'calendar'}
         <button
-          class="mt-1 px-2 py-1 border {n('border-neon-red-dark hover:bg-neon-red-bg text-neon-red', 'border-red-300 hover:bg-red-100')} rounded text-xs"
+          class="mt-1 px-2.5 py-1 border {n('border-neon-red-dark hover:bg-neon-red-bg text-neon-red', 'border-red-200 hover:bg-red-100 text-red-700')} rounded-lg text-xs transition-colors"
           onclick={openCalendar}
         >
           Open Calendar to log in
@@ -735,27 +735,27 @@
   {/if}
 
   {#if preview}
-    <div class="mt-3 flex-1 flex flex-col min-h-0 {n('bg-retro-surface border-retro-border', 'bg-white border-gray-200')} border rounded shadow-sm">
-      <div class="px-3 py-2 border-b {n('border-retro-border', 'border-gray-200')} flex items-center justify-between">
-        <div class="text-xs {n('text-retro-text', 'text-gray-700')}">
-          <span class="font-medium">{preview.dateFrom}</span>
+    <div class="mt-3 flex-1 flex flex-col min-h-0 {n('bg-retro-surface border-retro-border', 'bg-white border-slate-200')} border rounded-xl shadow-sm">
+      <div class="px-3 py-2.5 border-b {n('border-retro-border', 'border-slate-100')} flex items-center justify-between">
+        <div class="text-xs {n('text-retro-text', 'text-slate-700')} font-medium">
+          <span>{preview.dateFrom}</span>
           {#if preview.dateFrom !== preview.dateTo}
-            <span> → {preview.dateTo}</span>
+            <span class="text-slate-400"> → {preview.dateTo}</span>
           {/if}
         </div>
-        <div class="text-[11px] {n('text-retro-dim', 'text-gray-500')}">
-          {rows.length} entries · {rows.filter((r) => r.alreadyLogged).length} already logged · {unmapped.length} unmapped · {preview.skippedByMapping} skipped by mapping · {preview.skippedAllDay} all-day · {preview.skippedByAttendance} declined
+        <div class="text-[11px] {n('text-retro-dim', 'text-slate-400')}">
+          {rows.length} entries · {rows.filter((r) => r.alreadyLogged).length} logged · {unmapped.length} unmapped · {preview.skippedByMapping} skipped · {preview.skippedAllDay} all-day · {preview.skippedByAttendance} declined
         </div>
       </div>
 
       <div class="flex-1 min-h-0 overflow-auto p-2 space-y-1">
         {#if rows.length === 0}
-          <div class="text-xs {n('text-retro-muted', 'text-gray-500')} italic text-center py-4">
+          <div class="text-xs {n('text-retro-muted', 'text-slate-400')} italic text-center py-6">
             No commits, reviews or mapped meetings in this date range
           </div>
         {/if}
         <button
-          class="w-full px-2 py-1 border border-dashed {n('border-neon-purple text-neon-purple hover:bg-neon-purple-bg', 'border-indigo-300 text-indigo-700 hover:bg-indigo-50')} rounded text-xs"
+          class="w-full px-2.5 py-1.5 border border-dashed {n('border-neon-purple text-neon-purple hover:bg-neon-purple-bg', 'border-slate-200 text-slate-500 hover:bg-slate-50')} rounded-lg text-xs transition-colors"
           onclick={addManualRow}
           disabled={posting}
         >
@@ -763,7 +763,7 @@
         </button>
         {#each rowsByDate as group (group.date)}
           {#if rowsByDate.length > 1}
-            <div class="flex items-center justify-between px-2 py-1 rounded {n('bg-retro-surface2 text-retro-bright', 'bg-gray-100 text-gray-700')} text-[11px] font-medium">
+            <div class="flex items-center justify-between px-2.5 py-1 rounded-lg {n('bg-retro-surface2 text-retro-bright', 'bg-slate-50 text-slate-600')} text-[11px] font-medium">
               <span>{formatDateHeader(group.date)}</span>
               {#if dayTotalMinutes(group.groupRows) > 0}
                 <span class="{n('text-neon-cyan', 'text-blue-600')} font-mono">{formatDuration(dayTotalMinutes(group.groupRows))}</span>
@@ -771,11 +771,11 @@
             </div>
           {/if}
           {#each group.groupRows as r (r.entry.id)}
-          <div class="border rounded text-xs {rowBg(r)}">
-          <div class="flex items-center gap-2 px-2 py-1.5">
+          <div class="border rounded-lg text-xs {rowBg(r)}">
+          <div class="flex items-center gap-2 px-2.5 py-1.5">
             <input
               type="checkbox"
-              class="shrink-0 {n('accent-neon-cyan', '')}"
+              class="shrink-0 {n('accent-neon-cyan', 'accent-blue-600')}"
               bind:checked={r.include}
               disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
             />
@@ -785,7 +785,7 @@
             {#if r.entry.source === 'manual'}
               <input
                 type="date"
-                class="shrink-0 w-28 px-1 py-0.5 border {n('border-retro-border2 font-mono text-retro-text bg-retro-surface disabled:bg-retro-bg', 'border-gray-300 font-mono text-gray-700 bg-white disabled:bg-gray-50')} rounded"
+                class="shrink-0 w-28 px-1.5 py-0.5 border {n('border-retro-border2 font-mono text-retro-text bg-retro-surface disabled:bg-retro-bg', 'border-slate-200 font-mono text-slate-700 bg-white disabled:bg-slate-50')} rounded-md"
                 bind:value={r.entry.date}
                 disabled={posting || r.postStatus === 'ok'}
                 title="Date"
@@ -801,10 +801,10 @@
                 />
               </div>
             {:else}
-              <span class="shrink-0 {n('text-retro-muted', 'text-gray-500')} w-20 font-mono">{r.entry.date}</span>
+              <span class="shrink-0 {n('text-retro-muted', 'text-slate-400')} w-20 font-mono">{r.entry.date}</span>
               <div class="shrink-0 w-32 flex items-center gap-3">
                 <button
-                  class="{n('text-neon-cyan', 'text-blue-600')} font-mono font-medium text-left hover:underline truncate"
+                  class="{n('text-neon-cyan', 'text-blue-600')} font-mono font-medium text-left hover:underline truncate transition-colors"
                   title={r.entry.issueTitle ?? r.entry.issueKey ?? ''}
                   onclick={() => { if (r.entry.issueKey) chrome.tabs.create({ url: `${JIRA_BASE_URL}/browse/${r.entry.issueKey}` }); }}
                 >
@@ -812,14 +812,14 @@
                 </button>
                 {#if r.entry.source === 'review' && r.entry.sourceInfo.prNumber != null && r.entry.sourceInfo.repo}
                   <button
-                    class="shrink-0 {n('text-neon-purple hover:text-neon-purple-dark', 'text-purple-500 hover:text-purple-700')} leading-none"
+                    class="shrink-0 {n('text-neon-purple hover:text-neon-purple-dark', 'text-purple-400 hover:text-purple-600')} leading-none transition-colors"
                     title="Open PR #{r.entry.sourceInfo.prNumber} on GitHub"
                     onclick={() => chrome.tabs.create({ url: `https://github.com/${r.entry.sourceInfo.repo}/pull/${r.entry.sourceInfo.prNumber}` })}
                   >PR🔗</button>
                 {/if}
                 {#if r.entry.source === 'commit' && r.entry.sourceInfo.commits?.length}
                   <button
-                    class="shrink-0 {n('text-neon-orange hover:text-neon-orange-dark', 'text-orange-500 hover:text-orange-700')} leading-none text-sm font-medium tabular-nums"
+                    class="shrink-0 {n('text-neon-orange hover:text-neon-orange-dark', 'text-orange-400 hover:text-orange-600')} leading-none text-sm font-medium tabular-nums transition-colors"
                     title="{r.entry.sourceInfo.commits.length} commit{r.entry.sourceInfo.commits.length !== 1 ? 's' : ''} — click to {r.showCommitDetails ? 'hide' : 'show'}"
                     onclick={() => { r.showCommitDetails = !r.showCommitDetails; }}
                   >{r.entry.sourceInfo.commits.length}⎇</button>
@@ -830,36 +830,36 @@
               <input
                 type="number"
                 min="0"
-                class="w-9 px-1 py-0.5 border {n('border-retro-border2 text-neon-yellow bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-gray-300 text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500')} rounded text-right font-mono"
+                class="w-9 px-1 py-0.5 border {n('border-retro-border2 text-neon-yellow bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-slate-200 text-slate-700 bg-white disabled:bg-slate-50 disabled:text-slate-400')} rounded-md text-right font-mono"
                 bind:value={r.hoursInput}
                 oninput={() => syncRowMinutes(r)}
                 disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
                 aria-label="Hours"
               />
-              <span class="text-[10px] {n('text-retro-muted', 'text-gray-500')}">h</span>
+              <span class="text-[10px] {n('text-retro-muted', 'text-slate-400')}">h</span>
               <input
                 type="number"
                 min="0"
-                class="w-9 px-1 py-0.5 border {n('border-retro-border2 text-neon-yellow bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-gray-300 text-amber-700 bg-white disabled:bg-gray-50 disabled:text-gray-500')} rounded text-right font-mono"
+                class="w-9 px-1 py-0.5 border {n('border-retro-border2 text-neon-yellow bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-slate-200 text-slate-700 bg-white disabled:bg-slate-50 disabled:text-slate-400')} rounded-md text-right font-mono"
                 bind:value={r.minutesInput}
                 oninput={() => syncRowMinutes(r)}
                 disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
                 aria-label="Minutes"
               />
-              <span class="text-[10px] {n('text-retro-muted', 'text-gray-500')}">m</span>
+              <span class="text-[10px] {n('text-retro-muted', 'text-slate-400')}">m</span>
             </div>
             {#if r.entry.source === 'manual'}
               <input
                 type="text"
                 placeholder="description"
-                class="flex-1 min-w-0 px-1.5 py-0.5 border {n('border-retro-border2 text-retro-text bg-retro-surface disabled:bg-retro-bg', 'border-gray-300 text-gray-700 bg-white disabled:bg-gray-50')} rounded"
+                class="flex-1 min-w-0 px-1.5 py-0.5 border {n('border-retro-border2 text-retro-text bg-retro-surface disabled:bg-retro-bg', 'border-slate-200 text-slate-700 bg-white disabled:bg-slate-50')} rounded-md"
                 bind:value={r.entry.comment}
                 disabled={posting || r.postStatus === 'ok'}
               />
             {:else}
               <input
                 type="text"
-                class="flex-1 min-w-0 px-1.5 py-0.5 border {n('border-retro-border2 text-retro-text bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-gray-300 text-gray-700 bg-white disabled:bg-gray-50 disabled:text-gray-400')} rounded"
+                class="flex-1 min-w-0 px-1.5 py-0.5 border {n('border-retro-border2 text-retro-text bg-retro-surface disabled:bg-retro-bg disabled:text-retro-dim', 'border-slate-200 text-slate-700 bg-white disabled:bg-slate-50 disabled:text-slate-400')} rounded-md"
                 bind:value={r.entry.comment}
                 disabled={r.alreadyLogged || posting || r.postStatus === 'ok'}
                 title={r.entry.comment}
@@ -867,16 +867,16 @@
             {/if}
             <span class="shrink-0 w-4 text-right">
               {#if r.postStatus === 'posting'}
-                <span class="{n('text-neon-cyan', 'text-blue-600')}">…</span>
+                <span class="{n('text-neon-cyan', 'text-blue-500')}">…</span>
               {:else if r.postStatus === 'ok'}
-                <span class="{n('text-neon-green', 'text-green-600')}">✓</span>
+                <span class="{n('text-neon-green', 'text-green-500')}">✓</span>
               {:else if r.postStatus === 'fail'}
-                <span class="{n('text-neon-red', 'text-red-600')}" title={r.postError}>✗</span>
+                <span class="{n('text-neon-red', 'text-red-500')}" title={r.postError}>✗</span>
               {:else if r.alreadyLogged}
-                <span class="{n('text-retro-dim', 'text-gray-500')}" title="Already logged in Tempo">⊘</span>
+                <span class="{n('text-retro-dim', 'text-slate-400')}" title="Already logged in Tempo">⊘</span>
               {:else if r.entry.source === 'manual'}
                 <button
-                  class="{n('text-neon-red hover:bg-neon-red-bg', 'text-red-600 hover:bg-red-50')} rounded"
+                  class="{n('text-neon-red hover:bg-neon-red-bg', 'text-slate-400 hover:text-red-500')} rounded-md transition-colors"
                   onclick={() => removeManualRow(r.entry.id)}
                   disabled={posting}
                   title="Remove manual entry"
@@ -888,18 +888,18 @@
             </span>
           </div>
           {#if r.showCommitDetails && r.entry.source === 'commit' && r.entry.sourceInfo.commits?.length}
-            <div class="border-t {n('border-neon-orange/30 bg-retro-surface', 'border-orange-100 bg-orange-50')} px-3 py-1.5 space-y-0.5">
+            <div class="border-t {n('border-neon-orange/30 bg-retro-surface', 'border-slate-100 bg-slate-50')} px-3 py-1.5 space-y-0.5">
               {#each r.entry.sourceInfo.commits as c}
                 <div class="flex gap-2 items-baseline">
                   <button
-                    class="font-mono text-[10px] {n('text-neon-orange hover:text-neon-orange-dark', 'text-orange-500 hover:text-orange-700')} hover:underline shrink-0"
+                    class="font-mono text-[10px] {n('text-neon-orange hover:text-neon-orange-dark', 'text-orange-500 hover:text-orange-600')} hover:underline shrink-0 transition-colors"
                     title="Open commit on GitHub"
                     onclick={() => chrome.tabs.create({ url: `https://github.com/${c.repo}/commit/${c.sha}` })}
                   >{c.sha.slice(0, 7)}</button>
                   {#if c.committedAt}
-                    <span class="text-[10px] {n('text-retro-dim', 'text-gray-400')} shrink-0 tabular-nums">{formatCommitTime(c.committedAt)}</span>
+                    <span class="text-[10px] {n('text-retro-dim', 'text-slate-400')} shrink-0 tabular-nums">{formatCommitTime(c.committedAt)}</span>
                   {/if}
-                  <span class="text-[11px] {n('text-retro-text', 'text-gray-600')} truncate" title={c.message}>{c.message.length > 72 ? c.message.slice(0, 72) + '…' : c.message}</span>
+                  <span class="text-[11px] {n('text-retro-text', 'text-slate-600')} truncate" title={c.message}>{c.message.length > 72 ? c.message.slice(0, 72) + '…' : c.message}</span>
                 </div>
               {/each}
             </div>
@@ -910,20 +910,20 @@
       </div>
 
       {#if unmapped.length > 0}
-        <div class="border-t {n('border-retro-border bg-neon-yellow-bg', 'border-gray-200 bg-amber-50')} px-3 py-2">
-          <div class="text-xs font-medium {n('text-neon-yellow', 'text-amber-900')} mb-1">
+        <div class="border-t {n('border-retro-border bg-neon-yellow-bg', 'border-slate-100 bg-amber-50')} px-3 py-2.5">
+          <div class="text-xs font-semibold {n('text-neon-yellow', 'text-amber-800')} mb-1">
             Map {unmapped.length} meeting{unmapped.length === 1 ? '' : 's'} to Jira
           </div>
-          <div class="text-[10px] {n('text-neon-yellow opacity-80', 'text-amber-700')} mb-2">
+          <div class="text-[10px] {n('text-neon-yellow opacity-80', 'text-amber-600')} mb-2">
             Edit the match text to control future auto-mapping (substring, case-insensitive). Longest match wins.
           </div>
           <div class="space-y-1.5">
             {#each unmapped as u (u.event.id)}
-              <div class="{n('bg-retro-surface2 border border-neon-yellow/40', 'bg-white border border-amber-200')} rounded p-2">
-                <div class="text-xs {n('text-retro-bright', 'text-gray-800')} font-medium truncate" title={u.event.title}>
+              <div class="{n('bg-retro-surface2 border border-neon-yellow/40', 'bg-white border border-amber-100')} rounded-lg p-2">
+                <div class="text-xs {n('text-retro-bright', 'text-slate-800')} font-medium truncate" title={u.event.title}>
                   {u.event.title}
                 </div>
-                <div class="text-[10px] {n('text-retro-dim', 'text-gray-500')} mb-1.5">
+                <div class="text-[10px] {n('text-retro-dim', 'text-slate-500')} mb-1.5">
                   {new Date(u.event.startMs).toLocaleString()} · {u.event.durationMinutes}m
                 </div>
                 <div class="flex gap-1.5 items-center">
@@ -931,7 +931,7 @@
                     type="text"
                     placeholder="match substring"
                     bind:value={u.matchInput}
-                    class="flex-1 px-1.5 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-gray-300')} rounded text-[11px]"
+                    class="flex-1 px-1.5 py-1 border {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-slate-200 bg-white text-slate-700')} rounded-md text-[11px]"
                   />
                   <div class="w-32">
                     <JiraPicker
@@ -941,7 +941,7 @@
                     />
                   </div>
                   <label
-                    class="flex items-center gap-0.5 text-[10px] {n('text-retro-text', 'text-gray-700')} cursor-pointer shrink-0"
+                    class="flex items-center gap-0.5 text-[10px] {n('text-retro-text', 'text-slate-600')} cursor-pointer shrink-0"
                     title="Drop this meeting — don't log it"
                   >
                     <input
@@ -952,7 +952,7 @@
                     Skip
                   </label>
                   <button
-                    class="px-2 py-1 {n('bg-neon-orange hover:bg-neon-orange-dark disabled:bg-retro-border2', 'bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300')} text-white text-[11px] rounded shrink-0"
+                    class="px-2 py-1 {n('bg-neon-orange hover:bg-neon-orange-dark disabled:bg-retro-border2', 'bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400')} text-white text-[11px] rounded-md shrink-0 transition-colors"
                     disabled={u.saving ||
                       !u.matchInput.trim() ||
                       (!u.skipInput &&
@@ -968,28 +968,28 @@
         </div>
       {/if}
 
-      <div class="border-t {n('border-retro-border', 'border-gray-200')} px-3 py-2 flex items-center justify-between gap-2">
+      <div class="border-t {n('border-retro-border', 'border-slate-100')} px-3 py-2.5 flex items-center justify-between gap-2">
         {#if summary}
           <div class="text-xs">
-            <span class="{n('text-neon-green', 'text-green-700')} font-medium">✓ {summary.ok} posted</span>
+            <span class="{n('text-neon-green', 'text-green-600')} font-medium">✓ {summary.ok} posted</span>
             {#if summary.fail > 0}
-              <span class="{n('text-neon-red', 'text-red-700')} font-medium ml-2">✗ {summary.fail} failed</span>
+              <span class="{n('text-neon-red', 'text-red-600')} font-medium ml-2">✗ {summary.fail} failed</span>
             {/if}
             {#if summary.skipped > 0}
-              <span class="{n('text-retro-muted', 'text-gray-500')} ml-2">⊘ {summary.skipped} skipped</span>
+              <span class="{n('text-retro-muted', 'text-slate-400')} ml-2">⊘ {summary.skipped} skipped</span>
             {/if}
           </div>
         {:else}
-          <div class="text-xs {n('text-retro-muted', 'text-gray-500')}">
+          <div class="text-xs {n('text-retro-muted', 'text-slate-500')}">
             {#if toPostCount > 0}
-              Ready to post {toPostCount} entries · <span class="font-medium {n('text-retro-text', 'text-gray-700')}">{formatDuration(toPostMinutes)}</span>
+              Ready to post {toPostCount} entries · <span class="font-medium {n('text-retro-text', 'text-slate-700')}">{formatDuration(toPostMinutes)}</span>
             {:else}
               Nothing to post — check entries above
             {/if}
           </div>
         {/if}
         <button
-          class="px-4 py-1.5 {n('bg-neon-green-dark hover:bg-neon-green disabled:bg-retro-border2 disabled:shadow-none shadow-neon-green', 'bg-green-600 hover:bg-green-700 disabled:bg-gray-300')} text-white text-sm rounded disabled:cursor-not-allowed font-medium"
+          class="px-4 py-1.5 {n('bg-neon-green-dark hover:bg-neon-green disabled:bg-retro-border2 disabled:shadow-none shadow-neon-green', 'bg-green-600 hover:bg-green-700 disabled:bg-slate-200 disabled:text-slate-400')} text-white text-sm rounded-lg disabled:cursor-not-allowed font-medium transition-colors"
           disabled={posting || loading || toPostCount === 0}
           onclick={post}
         >
