@@ -42,6 +42,68 @@ export interface CommitActivity {
   message: string;
 }
 
+type RawCommitItem = {
+  sha: string;
+  commit: { message: string; author: { date: string } };
+  repository: { full_name: string };
+};
+
+async function fetchCommitSearchPage(
+  token: string,
+  q: string,
+): Promise<RawCommitItem[]> {
+  const items: RawCommitItem[] = [];
+  let page = 1;
+  while (true) {
+    const res = await gh(
+      token,
+      `/search/commits?q=${encodeURIComponent(q)}&per_page=100&page=${page}`,
+    );
+    if (!res.ok) {
+      throw new Error(
+        `searchMyCommits failed: ${res.status} ${await res.text().catch(() => '')}`,
+      );
+    }
+    const data = (await res.json()) as { total_count: number; items: RawCommitItem[] };
+    items.push(...data.items);
+    if (data.items.length < 100 || items.length >= data.total_count || items.length >= 1000) break;
+    page++;
+  }
+  return items;
+}
+
+function processCommitItems(items: RawCommitItem[], seen: Set<string>): CommitActivity[] {
+  const results: CommitActivity[] = [];
+  for (const item of items) {
+    if (seen.has(item.sha)) continue;
+    seen.add(item.sha);
+    const firstLine = item.commit.message.split('\n')[0];
+    const jiraKeys = extractJiraKeys(firstLine);
+    if (jiraKeys.length === 0) {
+      results.push({
+        date: item.commit.author.date.slice(0, 10),
+        committedAt: item.commit.author.date,
+        jiraKey: null,
+        repo: item.repository.full_name,
+        commitSha: item.sha,
+        message: firstLine,
+      });
+    } else {
+      for (const jiraKey of jiraKeys) {
+        results.push({
+          date: item.commit.author.date.slice(0, 10),
+          committedAt: item.commit.author.date,
+          jiraKey,
+          repo: item.repository.full_name,
+          commitSha: item.sha,
+          message: firstLine,
+        });
+      }
+    }
+  }
+  return results;
+}
+
 export async function searchMyCommits(params: {
   token: string;
   username: string;
@@ -50,51 +112,24 @@ export async function searchMyCommits(params: {
   dateTo: string;
 }): Promise<CommitActivity[]> {
   const results: CommitActivity[] = [];
+  // Track seen SHAs across both author: and co-author: queries to avoid duplicates.
+  const seen = new Set<string>();
+
   for (const org of params.orgs) {
-    const q = `author:${params.username} org:${org} author-date:${params.dateFrom}..${params.dateTo}`;
-    const res = await gh(
-      params.token,
-      `/search/commits?q=${encodeURIComponent(q)}&per_page=100`,
-    );
-    if (!res.ok) {
-      throw new Error(
-        `searchMyCommits failed for ${org}: ${res.status} ${await res
-          .text()
-          .catch(() => '')}`,
-      );
-    }
-    const data = (await res.json()) as {
-      items: Array<{
-        sha: string;
-        commit: { message: string; author: { date: string } };
-        repository: { full_name: string };
-      }>;
-    };
-    for (const item of data.items) {
-      const firstLine = item.commit.message.split('\n')[0];
-      const jiraKeys = extractJiraKeys(firstLine);
-      if (jiraKeys.length === 0) {
-        results.push({
-          date: item.commit.author.date.slice(0, 10),
-          committedAt: item.commit.author.date,
-          jiraKey: null,
-          repo: item.repository.full_name,
-          commitSha: item.sha,
-          message: firstLine,
-        });
-      } else {
-        for (const jiraKey of jiraKeys) {
-          results.push({
-            date: item.commit.author.date.slice(0, 10),
-            committedAt: item.commit.author.date,
-            jiraKey,
-            repo: item.repository.full_name,
-            commitSha: item.sha,
-            message: firstLine,
-          });
-        }
-      }
-    }
+    const dateRange = `${params.dateFrom}..${params.dateTo}`;
+    // Find commits where the user is the git author (regular local commits).
+    const authorQ = `author:${params.username} org:${org} author-date:${dateRange}`;
+    // Find commits where the user is a co-author (e.g. commits made by the
+    // Claude bot via GitHub Actions, which tag the user via Co-authored-by:).
+    const coAuthorQ = `co-author:${params.username} org:${org} author-date:${dateRange}`;
+
+    const [authorItems, coAuthorItems] = await Promise.all([
+      fetchCommitSearchPage(params.token, authorQ),
+      fetchCommitSearchPage(params.token, coAuthorQ),
+    ]);
+
+    results.push(...processCommitItems(authorItems, seen));
+    results.push(...processCommitItems(coAuthorItems, seen));
   }
   return results;
 }
