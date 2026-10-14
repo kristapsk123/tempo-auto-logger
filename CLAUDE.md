@@ -199,7 +199,11 @@ These were agreed with the user; don't relitigate unless they ask:
   Jira to the host on every open and after saving a mapping, so the skill
   maps and skips meetings the same way. The host never posts; the user
   reviews and presses Post. Without the host the section stays hidden.
-  Day headers show hours already in Tempo for that date.
+  Day headers show hours already in Tempo for that date. Each Claude row
+  can carry a note (where its hours came from, what it was about), shown
+  in a purple box under the row and never posted. The popup re-reads the
+  Claude timesheet list whenever its window gets focus, so a timesheet
+  rendered while the popup is open appears without reopening it.
 - **Manual entries:** the popup has an "+ Add manual entry" button that
   appends a row with an editable date, Jira picker, minutes, and
   description. Source is `'manual'`, icon `✎`, color indigo. These rows

@@ -185,7 +185,7 @@ function toClaudeEntry(entry: ClaudeTimesheetEntry, index: number): WorklogEntry
     comment: entry.comment,
     source: 'claude',
     include: true,
-    sourceInfo: {},
+    sourceInfo: entry.note ? { claudeNote: entry.note } : {},
   };
 }
 

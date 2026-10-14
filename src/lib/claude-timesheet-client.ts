@@ -25,6 +25,7 @@ export interface ClaudeTimesheetEntry {
   issueKey: string | null;
   minutes: number;
   comment: string;
+  note?: string;
 }
 
 export interface ClaudeTimesheet {

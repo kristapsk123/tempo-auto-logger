@@ -25,6 +25,7 @@ export interface WorklogEntry {
     eventId?: string;
     eventTitle?: string;
     matchedBy?: string;
+    claudeNote?: string;
   };
 }
 

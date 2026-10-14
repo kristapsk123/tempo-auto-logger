@@ -125,7 +125,7 @@
         getCustomIcon(),
       ]);
       hasPat = !!t;
-      void refreshClaudeTimesheets();
+      void refreshClaudeTimesheets(true);
       if (savedDates.dateFrom && savedDates.dateTo) {
         dateFrom = savedDates.dateFrom;
         dateTo = savedDates.dateTo;
@@ -398,7 +398,7 @@
     );
   }
 
-  async function refreshClaudeTimesheets() {
+  async function refreshClaudeTimesheets(shouldSync = false) {
     try {
       claudeTimesheets = await listClaudeTimesheets();
       claudeError = null;
@@ -406,8 +406,15 @@
       claudeTimesheets = null;
       claudeError = e instanceof Error ? e.message : String(e);
     }
-    if (claudeTimesheets !== null) void syncSettingsToClaude();
+    if (shouldSync && claudeTimesheets !== null) void syncSettingsToClaude();
   }
+
+  // A timesheet rendered while the popup is open shows up as soon as the user switches back to it.
+  $effect(() => {
+    const onFocus = () => void refreshClaudeTimesheets();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  });
 
   // Keeps the Claude skill mapping meetings exactly like this extension does.
   async function syncSettingsToClaude() {
@@ -999,6 +1006,11 @@
                   <span class="text-[11px] {n('text-retro-text', 'text-slate-600')} truncate" title={c.message}>{c.message.length > 72 ? c.message.slice(0, 72) + '…' : c.message}</span>
                 </div>
               {/each}
+            </div>
+          {/if}
+          {#if r.entry.source === 'claude' && r.entry.sourceInfo.claudeNote}
+            <div class="mx-2.5 mb-1.5 px-2 py-1 rounded-md text-[11px] {n('bg-neon-purple-bg text-neon-purple', 'bg-violet-50 text-violet-800')}" title="Claude's explanation, not posted to Tempo">
+              {r.entry.sourceInfo.claudeNote}
             </div>
           {/if}
           </div>
