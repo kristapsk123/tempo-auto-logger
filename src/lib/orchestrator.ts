@@ -174,6 +174,7 @@ export async function loadPreview(
 }
 
 const CLAUDE_ID_PREFIX = 'claude';
+const SECONDS_PER_MINUTE = 60;
 
 function toClaudeEntry(entry: ClaudeTimesheetEntry, index: number): WorklogEntry {
   return {
@@ -379,6 +380,8 @@ function computeAlreadyLogged(
       if (w.issue.key !== e.issueKey) continue;
       const wDate = typeof w.started === 'string' ? w.started.slice(0, 10) : '';
       if (wDate !== e.date) continue;
+      // A Claude row covers a whole ticket-day, so a shorter worklog with the same comment is a different entry.
+      if (e.source === 'claude' && w.timeSpentSeconds !== e.minutes * SECONDS_PER_MINUTE) continue;
       // 1. New format: sig marker present in existing comment.
       if (w.comment.includes(sigMarker)) {
         already.add(e.id);

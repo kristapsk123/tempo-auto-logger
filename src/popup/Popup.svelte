@@ -564,10 +564,16 @@
     return theme.neon ? neonClass : baseClass;
   }
 
+  // post() skips rows without a ticket, so they must not count as ready to post.
   let toPostRows = $derived(
     rows.filter(
-      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok',
+      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok' && !!r.entry.issueKey,
     ),
+  );
+  let needsTicketCount = $derived(
+    rows.filter(
+      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok' && !r.entry.issueKey,
+    ).length,
   );
   let toPostCount = $derived(toPostRows.length);
   let toPostMinutes = $derived(
@@ -1076,6 +1082,9 @@
               Ready to post {toPostCount} entries · <span class="font-medium {n('text-retro-text', 'text-slate-700')}">{formatDuration(toPostMinutes)}</span>
             {:else}
               Nothing to post — check entries above
+            {/if}
+            {#if needsTicketCount > 0}
+              <span class="ml-1 {n('text-neon-red', 'text-amber-600')}">· {needsTicketCount} need a ticket</span>
             {/if}
           </div>
         {/if}
