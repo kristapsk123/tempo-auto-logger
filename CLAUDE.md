@@ -42,7 +42,7 @@ token dance.
   stable for the purpose. **No `secid` XSRF param needed** — cookies
   alone authenticate it (verified 2026-04-21).
 - **Native messaging:** the `nativeMessaging` permission is only used for
-  the akima-timesheet host and carries no credentials.
+  the Claude Code timesheet host and carries no credentials.
 - **GitHub:** uses a normal personal access token (no SSO-like problem
   on github.com). Stored in `chrome.storage.local`. **Optional.** When
   no token is saved, the extension runs in **meetings-only mode** —
@@ -111,7 +111,7 @@ src/
     calendar-client.ts      Google Calendar sync.fetcheventrange
                             (same-origin, undocumented endpoint)
     jira-key-extractor.ts   Regex for extracting NUMO-\d+ from text
-    claude-timesheet-client.ts  Native messaging client for the akima-timesheet
+    claude-timesheet-client.ts  Native messaging client for the Claude Code timesheet
                             host (list and get rendered Claude timesheets,
                             sync mapping settings)
     aggregator.ts           Pure function: (commits, reviews, events,
@@ -189,7 +189,7 @@ These were agreed with the user; don't relitigate unless they ask:
 
   `computeSignature` and `stripSignature` are kept for pass 1 and for
   future robustness, but new entries no longer carry a sig.
-- **Claude timesheet import:** when the `com.akima.timesheet` native
+- **Claude timesheet import:** when the `com.visma.tempo_auto_logger` native
   messaging host is registered, the popup lists Claude-rendered
   timesheets; loading one replaces the preview with its rows (source
   `claude`, editable like manual rows, deduped against existing Tempo
@@ -289,21 +289,23 @@ These were agreed with the user; don't relitigate unless they ask:
 
 ## Claude timesheet host contract
 
-The native messaging host is not in this repo: it ships with the akima-timesheet Claude Code
-skill (`~/.claude/skills/akima-timesheet`, see its `docs/DEVELOPMENT.md`). The client is
+The native messaging host is not in this repo: it ships with the Claude Code plugin
+`visma-tempo-auto-logger` in `Visma-Enterprise-SIA-AI/claude-plugins` (see its `docs/DEVELOPMENT.md`).
+The client is
 `src/lib/claude-timesheet-client.ts`. Keep both sides in step when changing this contract.
 
-- Host name `com.akima.timesheet`, registered per user under
-  `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.akima.timesheet`. Its
+- Host name `com.visma.tempo_auto_logger`, registered per user: on Windows under
+  `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.visma.tempo_auto_logger`, on Linux as
+  `~/.config/google-chrome/NativeMessagingHosts/com.visma.tempo_auto_logger.json`. Its
   `allowed_origins` list the release id `lllmnccgpmaohmachieeindoelkaaood` plus any dev ids.
 - Requests (one per `chrome.runtime.sendNativeMessage` call):
   - `{ type: "listTimesheets" }` returns `{ ok: true, timesheets: [{ from, to, renderedAt,
     entryCount, totalMinutes }] }`, newest first, at most 10.
   - `{ type: "getTimesheet", from, to }` returns `{ ok: true, timesheet }` where `timesheet` is
-    `{ format: "akima-timesheet/tempo-v1", from, to, renderedAt, entries: [{ date,
+    `{ format: "tempo-auto-logger/claude-v1", from, to, renderedAt, entries: [{ date,
     issueKey: string | null, minutes, comment, note? }] }`. `note` is shown, never posted.
   - `{ type: "syncSettings", settings: { userMeetingMappings, teamMeetingMappings,
-    attendanceFilter, fallbackCommitJira } }` returns `{ ok: true, syncedAt }`. The skill builds
+    attendanceFilter, fallbackCommitJira } }` returns `{ ok: true, syncedAt }`. The plugin builds
     with these exactly like `aggregator.findMapping` and `shouldIncludeByAttendance`.
   - Any failure returns `{ ok: false, error }`.
 - A missing host makes Chrome report "Specified native messaging host not found";
@@ -312,8 +314,9 @@ skill (`~/.claude/skills/akima-timesheet`, see its `docs/DEVELOPMENT.md`). The c
 ### Developing the Claude import
 
 1. `npm run build`, then Load unpacked from `dist/` and note the new extension id.
-2. Register the host for it: `node ~/.claude/skills/akima-timesheet/scripts/timesheet.mjs
-   install-native-host --extension-id <id>` (the release id is always included).
+2. Register the host for it: run the plugin's setup, or `node <plugin>/scripts/timesheet.mjs
+   install-native-host --extension-id <id>` (the release id is always included and earlier ids
+   are kept).
 3. The unpacked build has its own empty `chrome.storage.local`: import your settings in
    Settings, Export / Import, so the sync sends real mappings.
 4. After rebuilding, click Reload on the unpacked card. A new rendered timesheet appears when

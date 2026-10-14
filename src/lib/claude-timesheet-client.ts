@@ -1,13 +1,13 @@
 import type { AttendanceFilter, MeetingMapping } from '../types';
 
 /**
- * Talks to the akima-timesheet native messaging host, which serves timesheets rendered by a local Claude
- * skill and stores this extension's mapping settings for it. Posting still goes through the normal Tempo
- * flow after the user reviews.
+ * Talks to the native messaging host of the Claude Code plugin visma-tempo-auto-logger, which serves
+ * timesheets rendered by Claude Code and stores this extension's mapping settings for it. Posting still
+ * goes through the normal Tempo flow after the user reviews.
  */
 
-export const CLAUDE_TIMESHEET_HOST = 'com.akima.timesheet';
-export const CLAUDE_TIMESHEET_FORMAT = 'akima-timesheet/tempo-v1';
+export const CLAUDE_TIMESHEET_HOST = 'com.visma.tempo_auto_logger';
+export const CLAUDE_TIMESHEET_FORMAT = 'tempo-auto-logger/claude-v1';
 
 // Chrome reports a host that is not registered this way; teammates without the skill must not see an error.
 const HOST_NOT_FOUND_PATTERN = /native messaging host not found/i;
