@@ -41,6 +41,8 @@ token dance.
   against `calendar.google.com`. Undocumented internal endpoint but
   stable for the purpose. **No `secid` XSRF param needed** — cookies
   alone authenticate it (verified 2026-04-21).
+- **Native messaging:** the `nativeMessaging` permission is only used for
+  the akima-timesheet host and carries no credentials.
 - **GitHub:** uses a normal personal access token (no SSO-like problem
   on github.com). Stored in `chrome.storage.local`. **Optional.** When
   no token is saved, the extension runs in **meetings-only mode** —
@@ -109,6 +111,9 @@ src/
     calendar-client.ts      Google Calendar sync.fetcheventrange
                             (same-origin, undocumented endpoint)
     jira-key-extractor.ts   Regex for extracting NUMO-\d+ from text
+    claude-timesheet-client.ts  Native messaging client for the akima-timesheet
+                            host (list and get rendered Claude timesheets,
+                            sync mapping settings)
     aggregator.ts           Pure function: (commits, reviews, events,
                             mappings, settings) -> WorklogEntry[]
                             + signature tagging for dedupe
@@ -184,6 +189,17 @@ These were agreed with the user; don't relitigate unless they ask:
 
   `computeSignature` and `stripSignature` are kept for pass 1 and for
   future robustness, but new entries no longer carry a sig.
+- **Claude timesheet import:** when the `com.akima.timesheet` native
+  messaging host is registered, the popup lists Claude-rendered
+  timesheets; loading one replaces the preview with its rows (source
+  `claude`, editable like manual rows, deduped against existing Tempo
+  worklogs by `loadClaudePreview`). Rows without a ticket are ones Claude
+  could not resolve; the user assigns them. The popup also syncs the user
+  and team meeting mappings, the attendance filter and the fallback commit
+  Jira to the host on every open and after saving a mapping, so the skill
+  maps and skips meetings the same way. The host never posts; the user
+  reviews and presses Post. Without the host the section stays hidden.
+  Day headers show hours already in Tempo for that date.
 - **Manual entries:** the popup has an "+ Add manual entry" button that
   appends a row with an editable date, Jira picker, minutes, and
   description. Source is `'manual'`, icon `✎`, color indigo. These rows
