@@ -287,6 +287,38 @@ These were agreed with the user; don't relitigate unless they ask:
 - **LF/CRLF warnings on Windows.** Harmless; git is just translating
   line endings on commit.
 
+## Claude timesheet host contract
+
+The native messaging host is not in this repo: it ships with the akima-timesheet Claude Code
+skill (`~/.claude/skills/akima-timesheet`, see its `docs/DEVELOPMENT.md`). The client is
+`src/lib/claude-timesheet-client.ts`. Keep both sides in step when changing this contract.
+
+- Host name `com.akima.timesheet`, registered per user under
+  `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.akima.timesheet`. Its
+  `allowed_origins` list the release id `lllmnccgpmaohmachieeindoelkaaood` plus any dev ids.
+- Requests (one per `chrome.runtime.sendNativeMessage` call):
+  - `{ type: "listTimesheets" }` returns `{ ok: true, timesheets: [{ from, to, renderedAt,
+    entryCount, totalMinutes }] }`, newest first, at most 10.
+  - `{ type: "getTimesheet", from, to }` returns `{ ok: true, timesheet }` where `timesheet` is
+    `{ format: "akima-timesheet/tempo-v1", from, to, renderedAt, entries: [{ date,
+    issueKey: string | null, minutes, comment, note? }] }`. `note` is shown, never posted.
+  - `{ type: "syncSettings", settings: { userMeetingMappings, teamMeetingMappings,
+    attendanceFilter, fallbackCommitJira } }` returns `{ ok: true, syncedAt }`. The skill builds
+    with these exactly like `aggregator.findMapping` and `shouldIncludeByAttendance`.
+  - Any failure returns `{ ok: false, error }`.
+- A missing host makes Chrome report "Specified native messaging host not found";
+  `listClaudeTimesheets` turns that into `null` and the popup hides the section.
+
+### Developing the Claude import
+
+1. `npm run build`, then Load unpacked from `dist/` and note the new extension id.
+2. Register the host for it: `node ~/.claude/skills/akima-timesheet/scripts/timesheet.mjs
+   install-native-host --extension-id <id>` (the release id is always included).
+3. The unpacked build has its own empty `chrome.storage.local`: import your settings in
+   Settings, Export / Import, so the sync sends real mappings.
+4. After rebuilding, click Reload on the unpacked card. A new rendered timesheet appears when
+   the popup window gets focus; no reload is needed for that.
+
 ## How to work on this
 
 1. `npm install` once.
@@ -323,6 +355,10 @@ The CI workflow uses `npm install` (not `npm ci`) as a safety net so
 small drifts don't break releases, but the rule is still: full
 `npm install` locally before committing a version bump, so the
 committed lockfile stays the source of truth.
+
+npm 12 (seen with 12.0.2) drops the optional `svelte-check/node_modules/picomatch@4.0.4` entry
+on a full `npm install`. Until CI and teammates use the same npm, keep master's lockfile and
+change only its two `version` fields when bumping.
 
 If you ever see CI fail with "Missing: ... from lock file":
 ```bash
