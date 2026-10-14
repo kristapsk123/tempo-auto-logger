@@ -14,7 +14,7 @@ export interface WorklogEntry {
   issueTitle?: string;
   minutes: number;
   comment: string;
-  source: 'commit' | 'review' | 'meeting' | 'manual';
+  source: 'commit' | 'review' | 'meeting' | 'manual' | 'claude';
   include: boolean;
   sourceInfo: {
     commitCount?: number;
@@ -76,6 +76,9 @@ export function computeSignature(entry: {
   issueKey: string | null;
   sourceInfo: WorklogEntry['sourceInfo'];
 }): string {
+  if (entry.source === 'claude') {
+    return `claude-${entry.issueKey ?? 'unassigned'}`;
+  }
   if (entry.source === 'commit') {
     return `commit-${entry.issueKey ?? 'unknown'}`;
   }
@@ -280,7 +283,7 @@ export function aggregate(input: AggregatorInput): AggregatorOutput {
 
   entries.sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
-    const order = { meeting: 0, review: 1, commit: 2, manual: 3 } as const;
+    const order = { meeting: 0, review: 1, commit: 2, manual: 3, claude: 4 } as const;
     if (order[a.source] !== order[b.source]) {
       return order[a.source] - order[b.source];
     }
