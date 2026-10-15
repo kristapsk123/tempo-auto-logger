@@ -9,6 +9,7 @@
     inputClass = '',
     size = 'compact' as 'compact' | 'normal',
     disabled = false,
+    isMissing = false,
     onchange,
   }: {
     value?: string;
@@ -17,17 +18,27 @@
     inputClass?: string;
     size?: 'compact' | 'normal';
     disabled?: boolean;
+    isMissing?: boolean;
     onchange?: (newValue: string) => void;
   } = $props();
 
-  const baseInputClass = $derived(
+  const sizeClass = $derived(
     size === 'normal'
+      ? 'w-full px-2 py-1.5 border rounded-lg text-sm font-mono uppercase'
+      : 'w-full px-1.5 py-1 border rounded-md text-[11px] font-mono uppercase',
+  );
+  const textClass = $derived(
+    theme.neon ? 'text-retro-text' : size === 'normal' ? 'text-slate-800' : 'text-slate-700',
+  );
+  // An empty box shows only the placeholder, which reads like a real key, so a missing key gets its own look.
+  const surfaceClass = $derived(
+    isMissing
       ? theme.neon
-        ? 'w-full px-2 py-1.5 border rounded-lg text-sm font-mono uppercase bg-retro-surface text-retro-text'
-        : 'w-full px-2 py-1.5 border rounded-lg text-sm font-mono uppercase text-slate-800'
+        ? 'border-dashed border-neon-yellow bg-neon-yellow-bg placeholder:text-neon-yellow/70'
+        : 'border-dashed border-amber-400 bg-amber-50 placeholder:text-amber-600'
       : theme.neon
-        ? 'w-full px-1.5 py-1 border rounded-md text-[11px] font-mono uppercase bg-retro-surface text-retro-text'
-        : 'w-full px-1.5 py-1 border border-slate-200 rounded-md text-[11px] font-mono uppercase text-slate-700',
+        ? 'border-retro-border2 bg-retro-surface'
+        : 'border-slate-200',
   );
 
   let showDropdown = $state(false);
@@ -114,7 +125,7 @@
     onfocus={openDropdown}
     onblur={closeDropdown}
     {placeholder}
-    class="{baseInputClass} {theme.neon ? 'border-retro-border2 disabled:bg-retro-bg disabled:text-retro-dim' : 'border-slate-200 disabled:bg-slate-50 disabled:text-slate-400'} {inputClass}"
+    class="{sizeClass} {textClass} {surfaceClass} {theme.neon ? 'disabled:bg-retro-bg disabled:text-retro-dim' : 'disabled:bg-slate-50 disabled:text-slate-400'} {inputClass}"
   />
   {#if showDropdown && !disabled && filtered.length > 0 && dropdownPos}
     <div

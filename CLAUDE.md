@@ -194,7 +194,10 @@ These were agreed with the user; don't relitigate unless they ask:
   timesheets; loading one replaces the preview with its rows (source
   `claude`, editable like manual rows, deduped against existing Tempo
   worklogs by `loadClaudePreview`). Rows without a ticket are ones Claude
-  could not resolve; the user assigns them. The popup also syncs the user
+  could not resolve; the user assigns them. An included, unposted row
+  without a ticket gets a yellow (neon) or amber left bar and a dashed
+  `pick ticket` box, because the picker's `NUMO-1234` placeholder looked
+  like a real key; Post skips such rows. The popup also syncs the user
   and team meeting mappings, the attendance filter and the fallback commit
   Jira to the host on every open and after saving a mapping, so the skill
   maps and skips meetings the same way. The host never posts; the user

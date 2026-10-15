@@ -38,6 +38,9 @@
   import CaptchaGate from '../components/CaptchaGate.svelte';
   import { theme, applyThemeClass } from '../lib/theme.svelte';
 
+  // Not key-shaped, so an empty ticket box cannot pass for a filled one.
+  const MISSING_TICKET_PLACEHOLDER = 'pick ticket';
+
   type RowState = {
     entry: WorklogEntry;
     include: boolean;
@@ -557,12 +560,14 @@
       if (r.postStatus === 'fail') return 'bg-neon-red-bg border-neon-red';
       if (r.postStatus === 'posting') return 'bg-neon-blue-bg border-neon-blue';
       if (r.alreadyLogged) return 'bg-retro-bg border-retro-border opacity-60';
+      if (isMissingTicket(r)) return 'bg-retro-surface2 border-neon-yellow border-l-4';
       return 'bg-retro-surface2 border-retro-border';
     }
     if (r.postStatus === 'ok') return 'bg-green-50 border-green-200';
     if (r.postStatus === 'fail') return 'bg-red-50 border-red-200';
     if (r.postStatus === 'posting') return 'bg-blue-50 border-blue-100';
     if (r.alreadyLogged) return 'bg-slate-50 border-slate-100 opacity-60';
+    if (isMissingTicket(r)) return 'bg-white border-amber-400 border-l-4';
     return 'bg-white border-slate-100';
   }
 
@@ -571,17 +576,17 @@
     return theme.neon ? neonClass : baseClass;
   }
 
+  function isPendingPost(r: RowState): boolean {
+    return r.include && !r.alreadyLogged && r.postStatus !== 'ok';
+  }
+
   // post() skips rows without a ticket, so they must not count as ready to post.
-  let toPostRows = $derived(
-    rows.filter(
-      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok' && !!r.entry.issueKey,
-    ),
-  );
-  let needsTicketCount = $derived(
-    rows.filter(
-      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok' && !r.entry.issueKey,
-    ).length,
-  );
+  function isMissingTicket(r: RowState): boolean {
+    return isPendingPost(r) && !r.entry.issueKey;
+  }
+
+  let toPostRows = $derived(rows.filter((r) => isPendingPost(r) && !!r.entry.issueKey));
+  let needsTicketCount = $derived(rows.filter(isMissingTicket).length);
   let toPostCount = $derived(toPostRows.length);
   let toPostMinutes = $derived(
     toPostRows.reduce((sum, r) => sum + (r.entry.minutes || 0), 0),
@@ -902,6 +907,8 @@
                   }}
                   favorites={preview?.favorites ?? []}
                   disabled={posting || r.postStatus === 'ok'}
+                  placeholder={MISSING_TICKET_PLACEHOLDER}
+                  isMissing={isMissingTicket(r)}
                 />
               </div>
             {:else}
@@ -1096,7 +1103,7 @@
               Nothing to post — check entries above
             {/if}
             {#if needsTicketCount > 0}
-              <span class="ml-1 {n('text-neon-red', 'text-amber-600')}">· {needsTicketCount} need a ticket</span>
+              <span class="ml-1 {n('text-neon-yellow', 'text-amber-600')}">· {needsTicketCount} need a ticket</span>
             {/if}
           </div>
         {/if}
