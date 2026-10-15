@@ -12,6 +12,8 @@ import {
 } from './jira-client';
 
 export type { JiraIssueOption } from './jira-client';
+import type { ClaudeSettingsSnapshot, ClaudeTimesheet, ClaudeTimesheetEntry } from './claude-timesheet-client';
+import type { MeetingMapping } from '../types';
 import {
   createWorklog,
   getTempoFavoriteIssueKeys,
@@ -171,6 +173,74 @@ export async function loadPreview(
   };
 }
 
+const CLAUDE_ID_PREFIX = 'claude';
+const SECONDS_PER_MINUTE = 60;
+
+function toClaudeEntry(entry: ClaudeTimesheetEntry, index: number): WorklogEntry {
+  return {
+    id: `${CLAUDE_ID_PREFIX}:${entry.date}:${index}`,
+    date: entry.date,
+    issueKey: entry.issueKey,
+    minutes: entry.minutes,
+    comment: entry.comment,
+    source: 'claude',
+    include: true,
+    sourceInfo: entry.note ? { claudeNote: entry.note } : {},
+  };
+}
+
+/**
+ * Builds the same preview as loadPreview, but the rows come from a Claude timesheet instead of GitHub and
+ * Calendar, so dedupe against existing Tempo worklogs and posting work unchanged.
+ */
+export async function loadClaudePreview(timesheet: ClaudeTimesheet): Promise<LoadedPreview> {
+  const me = await getMyself();
+  const [existing, jiraRecent, tempoFavoriteKeys, userMappings] = await Promise.all([
+    listWorklogs({ usernames: [me.name, me.key], dateFrom: timesheet.from, dateTo: timesheet.to }),
+    searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
+    getTempoFavoriteIssueKeys().catch(() => [] as string[]),
+    getUserMeetingMappings(),
+  ]);
+  const favorites = mergeFavorites(jiraRecent, userMappings.map((m) => m.jiraKey), tempoFavoriteKeys);
+  await fillMissingSummaries(favorites);
+  const entries = timesheet.entries.map(toClaudeEntry);
+  await attachIssueTitles(entries);
+  return {
+    dateFrom: timesheet.from,
+    dateTo: timesheet.to,
+    entries,
+    unmapped: [],
+    skippedAllDay: 0,
+    skippedByAttendance: 0,
+    skippedByMapping: 0,
+    existingWorklogs: existing,
+    alreadyLoggedIds: computeAlreadyLogged(entries, existing),
+    jiraWorker: { name: me.name, key: me.key },
+    favorites,
+    cachedFetch: {
+      commits: [],
+      reviews: [],
+      events: [],
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Europe/Riga',
+    },
+  };
+}
+
+/** The settings the Claude skill needs to map and skip exactly like this extension. */
+export async function collectClaudeSettings(): Promise<ClaudeSettingsSnapshot> {
+  const [userMeetingMappings, attendanceFilter, fallbackCommitJira] = await Promise.all([
+    getUserMeetingMappings(),
+    getAttendanceFilter(),
+    getFallbackCommitJira(),
+  ]);
+  return {
+    userMeetingMappings,
+    teamMeetingMappings: teamDefaults.meetings as MeetingMapping[],
+    attendanceFilter,
+    fallbackCommitJira,
+  };
+}
+
 export async function loadFavorites(): Promise<JiraIssueOption[]> {
   const [fromJira, mappings, tempoFavoriteKeys] = await Promise.all([
     searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
@@ -310,6 +380,8 @@ function computeAlreadyLogged(
       if (w.issue.key !== e.issueKey) continue;
       const wDate = typeof w.started === 'string' ? w.started.slice(0, 10) : '';
       if (wDate !== e.date) continue;
+      // A Claude row covers a whole ticket-day, so a shorter worklog with the same comment is a different entry.
+      if (e.source === 'claude' && w.timeSpentSeconds !== e.minutes * SECONDS_PER_MINUTE) continue;
       // 1. New format: sig marker present in existing comment.
       if (w.comment.includes(sigMarker)) {
         already.add(e.id);

@@ -41,6 +41,8 @@ token dance.
   against `calendar.google.com`. Undocumented internal endpoint but
   stable for the purpose. **No `secid` XSRF param needed** — cookies
   alone authenticate it (verified 2026-04-21).
+- **Native messaging:** the `nativeMessaging` permission is only used for
+  the Claude Code timesheet host and carries no credentials.
 - **GitHub:** uses a normal personal access token (no SSO-like problem
   on github.com). Stored in `chrome.storage.local`. **Optional.** When
   no token is saved, the extension runs in **meetings-only mode** —
@@ -109,6 +111,9 @@ src/
     calendar-client.ts      Google Calendar sync.fetcheventrange
                             (same-origin, undocumented endpoint)
     jira-key-extractor.ts   Regex for extracting NUMO-\d+ from text
+    claude-timesheet-client.ts  Native messaging client for the Claude Code timesheet
+                            host (list and get rendered Claude timesheets,
+                            sync mapping settings)
     aggregator.ts           Pure function: (commits, reviews, events,
                             mappings, settings) -> WorklogEntry[]
                             + signature tagging for dedupe
@@ -184,6 +189,21 @@ These were agreed with the user; don't relitigate unless they ask:
 
   `computeSignature` and `stripSignature` are kept for pass 1 and for
   future robustness, but new entries no longer carry a sig.
+- **Claude timesheet import:** when the `com.visma.tempo_auto_logger` native
+  messaging host is registered, the popup lists Claude-rendered
+  timesheets; loading one replaces the preview with its rows (source
+  `claude`, editable like manual rows, deduped against existing Tempo
+  worklogs by `loadClaudePreview`). Rows without a ticket are ones Claude
+  could not resolve; the user assigns them. The popup also syncs the user
+  and team meeting mappings, the attendance filter and the fallback commit
+  Jira to the host on every open and after saving a mapping, so the skill
+  maps and skips meetings the same way. The host never posts; the user
+  reviews and presses Post. Without the host the section stays hidden.
+  Day headers show hours already in Tempo for that date. Each Claude row
+  can carry a note (where its hours came from, what it was about), shown
+  in a purple box under the row and never posted. The popup re-reads the
+  Claude timesheet list whenever its window gets focus, so a timesheet
+  rendered while the popup is open appears without reopening it.
 - **Manual entries:** the popup has an "+ Add manual entry" button that
   appends a row with an editable date, Jira picker, minutes, and
   description. Source is `'manual'`, icon `✎`, color indigo. These rows
@@ -267,6 +287,41 @@ These were agreed with the user; don't relitigate unless they ask:
 - **LF/CRLF warnings on Windows.** Harmless; git is just translating
   line endings on commit.
 
+## Claude timesheet host contract
+
+The native messaging host is not in this repo: it ships with the Claude Code plugin
+`visma-tempo-auto-logger` in `Visma-Enterprise-SIA-AI/claude-plugins` (see its `docs/DEVELOPMENT.md`).
+The client is
+`src/lib/claude-timesheet-client.ts`. Keep both sides in step when changing this contract.
+
+- Host name `com.visma.tempo_auto_logger`, registered per user: on Windows under
+  `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.visma.tempo_auto_logger`, on Linux as
+  `~/.config/google-chrome/NativeMessagingHosts/com.visma.tempo_auto_logger.json`. Its
+  `allowed_origins` list the release id `lllmnccgpmaohmachieeindoelkaaood` plus any dev ids.
+- Requests (one per `chrome.runtime.sendNativeMessage` call):
+  - `{ type: "listTimesheets" }` returns `{ ok: true, timesheets: [{ from, to, renderedAt,
+    entryCount, totalMinutes }] }`, newest first, at most 10.
+  - `{ type: "getTimesheet", from, to }` returns `{ ok: true, timesheet }` where `timesheet` is
+    `{ format: "tempo-auto-logger/claude-v1", from, to, renderedAt, entries: [{ date,
+    issueKey: string | null, minutes, comment, note? }] }`. `note` is shown, never posted.
+  - `{ type: "syncSettings", settings: { userMeetingMappings, teamMeetingMappings,
+    attendanceFilter, fallbackCommitJira } }` returns `{ ok: true, syncedAt }`. The plugin builds
+    with these exactly like `aggregator.findMapping` and `shouldIncludeByAttendance`.
+  - Any failure returns `{ ok: false, error }`.
+- A missing host makes Chrome report "Specified native messaging host not found";
+  `listClaudeTimesheets` turns that into `null` and the popup hides the section.
+
+### Developing the Claude import
+
+1. `npm run build`, then Load unpacked from `dist/` and note the new extension id.
+2. Register the host for it: run the plugin's setup, or `node <plugin>/scripts/timesheet.mjs
+   install-native-host --extension-id <id>` (the release id is always included and earlier ids
+   are kept).
+3. The unpacked build has its own empty `chrome.storage.local`: import your settings in
+   Settings, Export / Import, so the sync sends real mappings.
+4. After rebuilding, click Reload on the unpacked card. A new rendered timesheet appears when
+   the popup window gets focus; no reload is needed for that.
+
 ## How to work on this
 
 1. `npm install` once.
@@ -303,6 +358,10 @@ The CI workflow uses `npm install` (not `npm ci`) as a safety net so
 small drifts don't break releases, but the rule is still: full
 `npm install` locally before committing a version bump, so the
 committed lockfile stays the source of truth.
+
+npm 12 (seen with 12.0.2) drops the optional `svelte-check/node_modules/picomatch@4.0.4` entry
+on a full `npm install`. Until CI and teammates use the same npm, keep master's lockfile and
+change only its two `version` fields when bumping.
 
 If you ever see CI fail with "Missing: ... from lock file":
 ```bash

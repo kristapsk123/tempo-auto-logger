@@ -1,10 +1,18 @@
 <script lang="ts">
   import {
     loadPreview,
+    loadClaudePreview,
+    collectClaudeSettings,
     reaggregate,
     postEntries,
     type LoadedPreview,
   } from '../lib/orchestrator';
+  import {
+    listClaudeTimesheets,
+    getClaudeTimesheet,
+    syncClaudeSettings,
+    type ClaudeTimesheetSummary,
+  } from '../lib/claude-timesheet-client';
   import JiraPicker from '../components/JiraPicker.svelte';
   import {
     addUserMeetingMapping,
@@ -94,6 +102,11 @@
   let loadErrorService = $state<AuthService | null>(null);
 
   let preview = $state<LoadedPreview | null>(null);
+  const SHOWN_CLAUDE_TIMESHEETS = 3;
+  const SECONDS_PER_MINUTE = 60;
+  let claudeTimesheets = $state<ClaudeTimesheetSummary[] | null>(null);
+  let claudeError = $state<string | null>(null);
+  let claudeSyncError = $state<string | null>(null);
   let rows = $state<RowState[]>([]);
   let unmapped = $state<UnmappedRow[]>([]);
 
@@ -112,6 +125,7 @@
         getCustomIcon(),
       ]);
       hasPat = !!t;
+      void refreshClaudeTimesheets(true);
       if (savedDates.dateFrom && savedDates.dateTo) {
         dateFrom = savedDates.dateFrom;
         dateTo = savedDates.dateTo;
@@ -352,7 +366,7 @@
     row.entry.minutes = h * 60 + m;
   }
 
-  async function load(dateFrom: string, dateTo: string) {
+  async function runLoad(loader: () => Promise<LoadedPreview>, onLoaded: () => void = () => {}) {
     loading = true;
     loadError = null;
     loadErrorService = null;
@@ -362,19 +376,60 @@
     summary = null;
 
     try {
-      const result = await loadPreview(dateFrom, dateTo);
+      const result = await loader();
       preview = result;
-      void setSessionPopupDates(dateFrom, dateTo).catch(() => {});
+      onLoaded();
       rebuildRows(result);
     } catch (e) {
       if (e instanceof SessionExpiredError) {
         loadErrorService = e.service;
-        loadError = `${e.service} session expired — log in and retry`;
+        loadError = `${e.service} session expired \u2014 log in and retry`;
       } else {
         loadError = e instanceof Error ? e.message : String(e);
       }
     }
     loading = false;
+  }
+
+  async function load(dateFrom: string, dateTo: string) {
+    await runLoad(
+      () => loadPreview(dateFrom, dateTo),
+      () => void setSessionPopupDates(dateFrom, dateTo).catch(() => {}),
+    );
+  }
+
+  async function refreshClaudeTimesheets(shouldSync = false) {
+    try {
+      claudeTimesheets = await listClaudeTimesheets();
+      claudeError = null;
+    } catch (e) {
+      claudeTimesheets = null;
+      claudeError = e instanceof Error ? e.message : String(e);
+    }
+    if (shouldSync && claudeTimesheets !== null) void syncSettingsToClaude();
+  }
+
+  // A timesheet rendered while the popup is open shows up as soon as the user switches back to it.
+  $effect(() => {
+    const onFocus = () => void refreshClaudeTimesheets();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  });
+
+  // Keeps the Claude skill mapping meetings exactly like this extension does.
+  async function syncSettingsToClaude() {
+    try {
+      await syncClaudeSettings(await collectClaudeSettings());
+      claudeSyncError = null;
+    } catch (e) {
+      claudeSyncError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function loadClaude(sheet: ClaudeTimesheetSummary) {
+    dateFrom = sheet.from;
+    dateTo = sheet.to;
+    await runLoad(async () => loadClaudePreview(await getClaudeTimesheet(sheet.from, sheet.to)));
   }
 
   async function saveMapping(row: UnmappedRow) {
@@ -405,6 +460,7 @@
       alreadyLoggedIds: fresh.alreadyLoggedIds,
     };
     rebuildRows(preview);
+    if (claudeTimesheets !== null) void syncSettingsToClaude();
   }
 
   async function post() {
@@ -462,10 +518,21 @@
     chrome.tabs.create({ url: `${CALENDAR_BASE_URL}/calendar/u/0/r` });
   }
 
+  function isEditableSource(source: WorklogEntry['source']): boolean {
+    return source === 'manual' || source === 'claude';
+  }
+
+  function loggedMinutesOn(date: string): number {
+    return (preview?.existingWorklogs ?? [])
+      .filter((w) => typeof w.started === 'string' && w.started.slice(0, 10) === date)
+      .reduce((sum, w) => sum + Math.round((w.timeSpentSeconds || 0) / SECONDS_PER_MINUTE), 0);
+  }
+
   function sourceIcon(source: WorklogEntry['source']): string {
     if (source === 'commit') return '⎇';
     if (source === 'review') return '👁';
     if (source === 'manual') return '✎';
+    if (source === 'claude') return '✦';
     return '📅';
   }
 
@@ -474,11 +541,13 @@
       if (source === 'commit') return 'text-neon-orange';
       if (source === 'review') return 'text-neon-purple';
       if (source === 'manual') return 'text-neon-purple';
+      if (source === 'claude') return 'text-neon-purple';
       return 'text-neon-cyan';
     }
     if (source === 'commit') return 'text-orange-500';
     if (source === 'review') return 'text-purple-500';
     if (source === 'manual') return 'text-indigo-500';
+    if (source === 'claude') return 'text-violet-500';
     return 'text-emerald-500';
   }
 
@@ -502,10 +571,16 @@
     return theme.neon ? neonClass : baseClass;
   }
 
+  // post() skips rows without a ticket, so they must not count as ready to post.
   let toPostRows = $derived(
     rows.filter(
-      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok',
+      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok' && !!r.entry.issueKey,
     ),
+  );
+  let needsTicketCount = $derived(
+    rows.filter(
+      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok' && !r.entry.issueKey,
+    ).length,
   );
   let toPostCount = $derived(toPostRows.length);
   let toPostMinutes = $derived(
@@ -658,6 +733,30 @@
         </button>
       </div>
     {/if}
+    {#if claudeTimesheets && claudeTimesheets.length > 0}
+      <div class="mb-3 px-3 py-2 border rounded-lg text-[11px] {n('border-neon-purple bg-retro-surface text-retro-text', 'border-violet-100 bg-violet-50 text-violet-900')}">
+        <div class="font-medium mb-1">Claude timesheets</div>
+        {#each claudeTimesheets.slice(0, SHOWN_CLAUDE_TIMESHEETS) as sheet (sheet.from + sheet.to)}
+          <div class="flex items-center justify-between gap-2 py-0.5">
+            <span class="font-mono">
+              {sheet.from === sheet.to ? sheet.from : `${sheet.from}..${sheet.to}`} · {sheet.entryCount} rows · {formatDuration(sheet.totalMinutes)}
+            </span>
+            <button
+              class="shrink-0 px-2 py-0.5 border rounded-md transition-colors {n('border-neon-purple text-neon-purple hover:bg-neon-purple-bg', 'border-violet-200 text-violet-700 hover:bg-violet-100')}"
+              disabled={loading || posting}
+              onclick={() => loadClaude(sheet)}
+            >
+              Load
+            </button>
+          </div>
+        {/each}
+        {#if claudeSyncError}
+          <div class="mt-1 {n('text-neon-red', 'text-red-600')}">Mappings not synced to Claude: {claudeSyncError}</div>
+        {/if}
+      </div>
+    {:else if claudeError}
+      <div class="mb-3 text-[11px] {n('text-neon-red', 'text-red-600')}">Claude timesheets unavailable: {claudeError}</div>
+    {/if}
     <div class="space-y-2.5">
       <div class="flex flex-wrap gap-1.5">
         {#each [
@@ -762,12 +861,17 @@
           + Add manual entry
         </button>
         {#each rowsByDate as group (group.date)}
-          {#if rowsByDate.length > 1}
+          {#if rowsByDate.length > 1 || loggedMinutesOn(group.date) > 0}
             <div class="flex items-center justify-between px-2.5 py-1 rounded-lg {n('bg-retro-surface2 text-retro-bright', 'bg-slate-50 text-slate-600')} text-[11px] font-medium">
               <span>{formatDateHeader(group.date)}</span>
-              {#if dayTotalMinutes(group.groupRows) > 0}
-                <span class="{n('text-neon-cyan', 'text-blue-600')} font-mono">{formatDuration(dayTotalMinutes(group.groupRows))}</span>
-              {/if}
+              <span class="flex items-center gap-2 font-mono">
+                {#if loggedMinutesOn(group.date) > 0}
+                  <span class="{n('text-retro-muted', 'text-slate-400')}" title="Already logged in Tempo for this day">in Tempo {formatDuration(loggedMinutesOn(group.date))}</span>
+                {/if}
+                {#if dayTotalMinutes(group.groupRows) > 0}
+                  <span class="{n('text-neon-cyan', 'text-blue-600')}">{formatDuration(dayTotalMinutes(group.groupRows))}</span>
+                {/if}
+              </span>
             </div>
           {/if}
           {#each group.groupRows as r (r.entry.id)}
@@ -782,7 +886,7 @@
             <span class="shrink-0 w-4 text-center {sourceColor(r.entry.source)}" title={r.entry.source}>
               {sourceIcon(r.entry.source)}
             </span>
-            {#if r.entry.source === 'manual'}
+            {#if isEditableSource(r.entry.source)}
               <input
                 type="date"
                 class="shrink-0 w-28 px-1.5 py-0.5 border {n('border-retro-border2 font-mono text-retro-text bg-retro-surface disabled:bg-retro-bg', 'border-slate-200 font-mono text-slate-700 bg-white disabled:bg-slate-50')} rounded-md"
@@ -848,7 +952,7 @@
               />
               <span class="text-[10px] {n('text-retro-muted', 'text-slate-400')}">m</span>
             </div>
-            {#if r.entry.source === 'manual'}
+            {#if isEditableSource(r.entry.source)}
               <input
                 type="text"
                 placeholder="description"
@@ -874,7 +978,7 @@
                 <span class="{n('text-neon-red', 'text-red-500')}" title={r.postError}>✗</span>
               {:else if r.alreadyLogged}
                 <span class="{n('text-retro-dim', 'text-slate-400')}" title="Already logged in Tempo">⊘</span>
-              {:else if r.entry.source === 'manual'}
+              {:else if isEditableSource(r.entry.source)}
                 <button
                   class="{n('text-neon-red hover:bg-neon-red-bg', 'text-slate-400 hover:text-red-500')} rounded-md transition-colors"
                   onclick={() => removeManualRow(r.entry.id)}
@@ -902,6 +1006,11 @@
                   <span class="text-[11px] {n('text-retro-text', 'text-slate-600')} truncate" title={c.message}>{c.message.length > 72 ? c.message.slice(0, 72) + '…' : c.message}</span>
                 </div>
               {/each}
+            </div>
+          {/if}
+          {#if r.entry.source === 'claude' && r.entry.sourceInfo.claudeNote}
+            <div class="mx-2.5 mb-1.5 px-2 py-1 rounded-md text-[11px] {n('bg-neon-purple-bg text-neon-purple', 'bg-violet-50 text-violet-800')}" title="Claude's explanation, not posted to Tempo">
+              {r.entry.sourceInfo.claudeNote}
             </div>
           {/if}
           </div>
@@ -985,6 +1094,9 @@
               Ready to post {toPostCount} entries · <span class="font-medium {n('text-retro-text', 'text-slate-700')}">{formatDuration(toPostMinutes)}</span>
             {:else}
               Nothing to post — check entries above
+            {/if}
+            {#if needsTicketCount > 0}
+              <span class="ml-1 {n('text-neon-red', 'text-amber-600')}">· {needsTicketCount} need a ticket</span>
             {/if}
           </div>
         {/if}
