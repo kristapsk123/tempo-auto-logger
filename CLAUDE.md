@@ -114,6 +114,8 @@ src/
     claude-timesheet-client.ts  Native messaging client for the Claude Code timesheet
                             host (list and get rendered Claude timesheets,
                             sync mapping settings)
+    meetings-to-map.ts      Meetings the popup's map form offers, from the
+                            calendar preview or a Claude timesheet
     aggregator.ts           Pure function: (commits, reviews, events,
                             mappings, settings) -> WorklogEntry[]
                             + signature tagging for dedupe
@@ -199,8 +201,15 @@ These were agreed with the user; don't relitigate unless they ask:
   `pick ticket` box, because the picker's `NUMO-1234` placeholder looked
   like a real key; Post skips such rows. The popup also syncs the user
   and team meeting mappings, the attendance filter and the fallback commit
-  Jira to the host on every open and after saving a mapping, so the skill
-  maps and skips meetings the same way. The host never posts; the user
+  Jira to the host on every open and after saving a mapping, and Settings
+  syncs whenever those are saved or imported, so the skill maps and skips
+  meetings the same way. A meeting row without a ticket carries its
+  meeting title, and the popup lists those meetings in the same "Map
+  meetings to Jira" form as the calendar flow, one form per title. Saving
+  adds a user mapping and applies it to the loaded rows (a ticket fills
+  matching rows, Skip unticks them), because a Claude timesheet cannot be
+  re-aggregated in the popup; Claude's next build uses the mapping. A
+  ticket picked on such a row is offered in its form. The host never posts; the user
   reviews and presses Post. Without the host the section stays hidden.
   Day headers show hours already in Tempo for that date. Each Claude row
   can carry a note (where its hours came from, what it was about), shown
@@ -306,7 +315,8 @@ The client is
     entryCount, totalMinutes }] }`, newest first, at most 10.
   - `{ type: "getTimesheet", from, to }` returns `{ ok: true, timesheet }` where `timesheet` is
     `{ format: "tempo-auto-logger/claude-v1", from, to, renderedAt, entries: [{ date,
-    issueKey: string | null, minutes, comment, note? }] }`. `note` is shown, never posted.
+    issueKey: string | null, minutes, comment, note?, meeting?: { title } }] }`. `note` is shown,
+    never posted; `meeting` is set on a meeting row without a ticket.
   - `{ type: "syncSettings", settings: { userMeetingMappings, teamMeetingMappings,
     attendanceFilter, fallbackCommitJira } }` returns `{ ok: true, syncedAt }`. The plugin builds
     with these exactly like `aggregator.findMapping` and `shouldIncludeByAttendance`.

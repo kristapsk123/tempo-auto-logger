@@ -30,7 +30,14 @@
     type UnmappedInputCache,
   } from '../lib/storage';
   import type { WorklogEntry } from '../lib/aggregator';
-  import type { CalendarEvent } from '../lib/calendar-client';
+  import {
+    calendarMeetingsToMap,
+    claudeMeetingId,
+    claudeMeetingsToMap,
+    isMatchedBy,
+    type MeetingToMap,
+  } from '../lib/meetings-to-map';
+  import type { MeetingMapping } from '../types';
   import { SessionExpiredError, type AuthService } from '../lib/http';
   import { JIRA_BASE_URL, CALENDAR_BASE_URL } from '../lib/config';
   import { getMyself } from '../lib/jira-client';
@@ -40,6 +47,7 @@
 
   // Not key-shaped, so an empty ticket box cannot pass for a filled one.
   const MISSING_TICKET_PLACEHOLDER = 'pick ticket';
+  const JIRA_KEY_PATTERN = /^[A-Z][A-Z0-9]+-\d+$/;
 
   type RowState = {
     entry: WorklogEntry;
@@ -55,7 +63,7 @@
   };
 
   type UnmappedRow = {
-    event: CalendarEvent;
+    meeting: MeetingToMap;
     jiraInput: string;
     matchInput: string;
     skipInput: boolean;
@@ -192,7 +200,7 @@
     }
     const cache: UnmappedInputCache = {};
     for (const u of unmapped) {
-      cache[u.event.id] = {
+      cache[u.meeting.id] = {
         jiraInput: u.jiraInput,
         matchInput: u.matchInput,
         skipInput: u.skipInput,
@@ -317,16 +325,17 @@
     // Preserve any inputs the user has already typed: check in-memory state
     // first (handles save-one-by-one reset), then session storage (handles
     // popup close/reopen).
-    const currentInputs = new Map(unmapped.map((u) => [u.event.id, u]));
-    unmapped = p.unmapped.map((ev) => {
-      const cur = currentInputs.get(ev.id);
+    const currentInputs = new Map(unmapped.map((u) => [u.meeting.id, u]));
+    const meetings = p.isFromClaude ? claudeMeetingsToMap(p.entries) : calendarMeetingsToMap(p.unmapped);
+    unmapped = meetings.map((meeting) => {
+      const cur = currentInputs.get(meeting.id);
       if (cur) return { ...cur, saving: false };
-      const ses = sessionUnmappedInputs[ev.id];
-      if (ses) return { event: ev, ...ses, saving: false };
+      const ses = sessionUnmappedInputs[meeting.id];
+      if (ses) return { meeting, ...ses, saving: false };
       return {
-        event: ev,
+        meeting,
         jiraInput: '',
-        matchInput: deriveMatchSuggestion(ev.title),
+        matchInput: deriveMatchSuggestion(meeting.title),
         skipInput: false,
         saving: false,
       };
@@ -435,27 +444,54 @@
     await runLoad(async () => loadClaudePreview(await getClaudeTimesheet(sheet.from, sheet.to)));
   }
 
+  function mappingFromInputs(row: UnmappedRow): MeetingMapping | null {
+    const match = row.matchInput.trim();
+    if (!match) return null;
+    if (row.skipInput) return { match, jiraKey: '', skip: true };
+    const jiraKey = row.jiraInput.trim().toUpperCase();
+    return JIRA_KEY_PATTERN.test(jiraKey) ? { match, jiraKey } : null;
+  }
+
   async function saveMapping(row: UnmappedRow) {
     if (!preview) return;
-    const match = row.matchInput.trim();
-    if (!match) return;
-    if (!row.skipInput) {
-      const jira = row.jiraInput.trim().toUpperCase();
-      if (!/^[A-Z][A-Z0-9]+-\d+$/.test(jira)) return;
-      row.saving = true;
-      await addUserMeetingMapping({ match, jiraKey: jira });
-    } else {
-      row.saving = true;
-      await addUserMeetingMapping({ match, jiraKey: '', skip: true });
+    const mapping = mappingFromInputs(row);
+    if (!mapping) return;
+    row.saving = true;
+    await addUserMeetingMapping(mapping);
+    if (preview.isFromClaude) applyMappingToClaudeRows(mapping);
+    else await reaggregateWithNewMapping(preview);
+    if (claudeTimesheets !== null) void syncSettingsToClaude();
+  }
+
+  // A Claude timesheet cannot be re-aggregated here, so the new mapping is applied to the rows it already has;
+  // Claude's next build redistributes the time of a skipped meeting.
+  function applyMappingToClaudeRows(mapping: MeetingMapping) {
+    for (const r of rows) {
+      const title = r.entry.sourceInfo.eventTitle;
+      if (r.entry.source !== 'claude' || !title || !isMatchedBy(title, mapping.match)) continue;
+      if (mapping.skip) r.include = false;
+      else r.entry.issueKey = mapping.jiraKey;
     }
+    unmapped = unmapped.filter((u) => !isMatchedBy(u.meeting.title, mapping.match));
+  }
+
+  // A ticket picked on a meeting row is the likely mapping, so the map form offers it.
+  function offerRowTicketForMapping(entry: WorklogEntry, ticket: string) {
+    const title = entry.sourceInfo.eventTitle;
+    if (!title) return;
+    const row = unmapped.find((u) => u.meeting.id === claudeMeetingId(title));
+    if (row && !row.skipInput) row.jiraInput = ticket;
+  }
+
+  async function reaggregateWithNewMapping(current: LoadedPreview) {
     const fresh = await reaggregate(
-      preview.cachedFetch,
-      preview.existingWorklogs,
-      preview.dateFrom,
-      preview.dateTo,
+      current.cachedFetch,
+      current.existingWorklogs,
+      current.dateFrom,
+      current.dateTo,
     );
     preview = {
-      ...preview,
+      ...current,
       entries: fresh.entries,
       unmapped: fresh.unmapped,
       skippedAllDay: fresh.skippedAllDay,
@@ -463,7 +499,6 @@
       alreadyLoggedIds: fresh.alreadyLoggedIds,
     };
     rebuildRows(preview);
-    if (claudeTimesheets !== null) void syncSettingsToClaude();
   }
 
   async function post() {
@@ -904,6 +939,7 @@
                   value={r.entry.issueKey ?? ''}
                   onchange={(v) => {
                     r.entry.issueKey = v;
+                    offerRowTicketForMapping(r.entry, v);
                   }}
                   favorites={preview?.favorites ?? []}
                   disabled={posting || r.postStatus === 'ok'}
@@ -1032,15 +1068,16 @@
           </div>
           <div class="text-[10px] {n('text-neon-yellow opacity-80', 'text-amber-600')} mb-2">
             Edit the match text to control future auto-mapping (substring, case-insensitive). Longest match wins.
+            {#if preview?.isFromClaude}Claude's next timesheet uses it too.{/if}
           </div>
           <div class="space-y-1.5">
-            {#each unmapped as u (u.event.id)}
+            {#each unmapped as u (u.meeting.id)}
               <div class="{n('bg-retro-surface2 border border-neon-yellow/40', 'bg-white border border-amber-100')} rounded-lg p-2">
-                <div class="text-xs {n('text-retro-bright', 'text-slate-800')} font-medium truncate" title={u.event.title}>
-                  {u.event.title}
+                <div class="text-xs {n('text-retro-bright', 'text-slate-800')} font-medium truncate" title={u.meeting.title}>
+                  {u.meeting.title}
                 </div>
                 <div class="text-[10px] {n('text-retro-dim', 'text-slate-500')} mb-1.5">
-                  {new Date(u.event.startMs).toLocaleString()} · {u.event.durationMinutes}m
+                  {u.meeting.whenLabel}
                 </div>
                 <div class="flex gap-1.5 items-center">
                   <input
@@ -1069,10 +1106,7 @@
                   </label>
                   <button
                     class="px-2 py-1 {n('bg-neon-orange hover:bg-neon-orange-dark disabled:bg-retro-border2', 'bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400')} text-white text-[11px] rounded-md shrink-0 transition-colors"
-                    disabled={u.saving ||
-                      !u.matchInput.trim() ||
-                      (!u.skipInput &&
-                        !/^[A-Z][A-Z0-9]+-\d+$/i.test(u.jiraInput.trim()))}
+                    disabled={u.saving || mappingFromInputs(u) === null}
                     onclick={() => saveMapping(u)}
                   >
                     {u.saving ? '…' : 'Save'}

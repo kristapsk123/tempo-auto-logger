@@ -26,6 +26,8 @@ export interface ClaudeTimesheetEntry {
   minutes: number;
   comment: string;
   note?: string;
+  // Set on a meeting row without a ticket, so the popup can offer to map that meeting.
+  meeting?: { title: string };
 }
 
 export interface ClaudeTimesheet {
@@ -41,6 +43,10 @@ export interface ClaudeSettingsSnapshot {
   teamMeetingMappings: MeetingMapping[];
   attendanceFilter: AttendanceFilter;
   fallbackCommitJira: string | null;
+}
+
+export function isHostMissingError(error: unknown): boolean {
+  return error instanceof Error && HOST_NOT_FOUND_PATTERN.test(error.message);
 }
 
 type HostResponse<T> = ({ ok: true } & T) | { ok: false; error: string };
@@ -64,7 +70,7 @@ export async function listClaudeTimesheets(): Promise<ClaudeTimesheetSummary[] |
     if (!response.ok) throw new Error(response.error);
     return response.timesheets;
   } catch (e) {
-    if (e instanceof Error && HOST_NOT_FOUND_PATTERN.test(e.message)) return null;
+    if (isHostMissingError(e)) return null;
     throw e;
   }
 }
