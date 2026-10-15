@@ -20,6 +20,36 @@ export interface ClaudeTimesheetSummary {
   totalMinutes: number;
 }
 
+export interface ClaudeCommit {
+  time: string;
+  repo: string;
+  hash: string;
+  subject: string;
+  url?: string;
+}
+
+export interface ClaudePullRequest {
+  repo: string;
+  number: number;
+  title: string;
+  url?: string;
+}
+
+export interface ClaudeMessage {
+  time: string;
+  channel: string;
+  author?: string;
+  isOwn: boolean;
+  text: string;
+}
+
+export interface ClaudeRowEvidence {
+  commits?: ClaudeCommit[];
+  pullRequests?: ClaudePullRequest[];
+  messages?: ClaudeMessage[];
+  omittedMessageCount?: number;
+}
+
 export interface ClaudeTimesheetEntry {
   date: string;
   issueKey: string | null;
@@ -28,6 +58,7 @@ export interface ClaudeTimesheetEntry {
   note?: string;
   // Set on a meeting row without a ticket, so the popup can offer to map that meeting.
   meeting?: { title: string };
+  evidence?: ClaudeRowEvidence;
 }
 
 export interface ClaudeTimesheet {

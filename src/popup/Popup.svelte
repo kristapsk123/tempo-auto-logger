@@ -14,6 +14,7 @@
     type ClaudeTimesheetSummary,
   } from '../lib/claude-timesheet-client';
   import JiraPicker from '../components/JiraPicker.svelte';
+  import ClaudeEvidence from '../components/ClaudeEvidence.svelte';
   import {
     addUserMeetingMapping,
     getGithubToken,
@@ -1055,6 +1056,9 @@
             <div class="mx-2.5 mb-1.5 px-2 py-1 rounded-md text-[11px] {n('bg-neon-purple-bg text-neon-purple', 'bg-violet-50 text-violet-800')}" title="Claude's explanation, not posted to Tempo">
               {r.entry.sourceInfo.claudeNote}
             </div>
+          {/if}
+          {#if r.entry.source === 'claude' && r.entry.sourceInfo.claudeEvidence}
+            <ClaudeEvidence evidence={r.entry.sourceInfo.claudeEvidence} />
           {/if}
           </div>
           {/each}

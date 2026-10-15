@@ -96,6 +96,8 @@ src/
   components/
     JiraPicker.svelte       Reusable combobox for picking Jira keys
                             with favorites / recent issues dropdown
+    ClaudeEvidence.svelte   Commits, PR links and Slack conversations
+                            behind a Claude row, expandable under it
   lib/
     config.ts               Base URLs
     http.ts                 jiraFetch() helper, SessionExpiredError
@@ -213,7 +215,12 @@ These were agreed with the user; don't relitigate unless they ask:
   reviews and presses Post. Without the host the section stays hidden.
   Day headers show hours already in Tempo for that date. Each Claude row
   can carry a note (where its hours came from, what it was about), shown
-  in a purple box under the row and never posted. The popup re-reads the
+  in a purple box under the row and never posted. Under the note, buttons
+  expand the commits behind the row (hash opens the commit on GitHub), open
+  each reviewed PR, and expand the row's Slack conversations that day,
+  other people's messages included; only `https://github.com/` links are
+  opened, and a link is missing when the plugin does not know the repo's
+  GitHub address. The popup re-reads the
   Claude timesheet list whenever its window gets focus, so a timesheet
   rendered while the popup is open appears without reopening it.
 - **Manual entries:** the popup has an "+ Add manual entry" button that
@@ -315,8 +322,11 @@ The client is
     entryCount, totalMinutes }] }`, newest first, at most 10.
   - `{ type: "getTimesheet", from, to }` returns `{ ok: true, timesheet }` where `timesheet` is
     `{ format: "tempo-auto-logger/claude-v1", from, to, renderedAt, entries: [{ date,
-    issueKey: string | null, minutes, comment, note?, meeting?: { title } }] }`. `note` is shown,
-    never posted; `meeting` is set on a meeting row without a ticket.
+    issueKey: string | null, minutes, comment, note?, meeting?: { title }, evidence? }] }`. `note`
+    is shown, never posted; `meeting` is set on a meeting row without a ticket; `evidence` holds
+    `commits` (time, repo, hash, subject, url?), `pullRequests` (repo, number, title, url?),
+    `messages` (time, channel, author?, isOwn, text) and `omittedMessageCount?`, each only when
+    non-empty.
   - `{ type: "syncSettings", settings: { userMeetingMappings, teamMeetingMappings,
     attendanceFilter, fallbackCommitJira } }` returns `{ ok: true, syncedAt }`. The plugin builds
     with these exactly like `aggregator.findMapping` and `shouldIncludeByAttendance`.

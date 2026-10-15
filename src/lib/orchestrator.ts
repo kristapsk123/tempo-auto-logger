@@ -196,6 +196,7 @@ function toClaudeEntry(entry: ClaudeTimesheetEntry, index: number): WorklogEntry
     sourceInfo: {
       ...(entry.note ? { claudeNote: entry.note } : {}),
       ...(entry.meeting?.title ? { eventTitle: entry.meeting.title } : {}),
+      ...(entry.evidence ? { claudeEvidence: entry.evidence } : {}),
     },
   };
 }
