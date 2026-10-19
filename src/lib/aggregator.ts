@@ -1,5 +1,6 @@
 import type { CommitActivity, ReviewActivity } from './github-client';
 import type { CalendarEvent } from './calendar-client';
+import type { ClaudeRowEvidence } from './claude-timesheet-client';
 import type {
   AttendanceFilter,
   DescriptionTemplates,
@@ -26,6 +27,7 @@ export interface WorklogEntry {
     eventTitle?: string;
     matchedBy?: string;
     claudeNote?: string;
+    claudeEvidence?: ClaudeRowEvidence;
   };
 }
 

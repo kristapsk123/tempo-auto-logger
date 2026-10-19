@@ -14,6 +14,7 @@
     type ClaudeTimesheetSummary,
   } from '../lib/claude-timesheet-client';
   import JiraPicker from '../components/JiraPicker.svelte';
+  import ClaudeEvidence from '../components/ClaudeEvidence.svelte';
   import {
     addUserMeetingMapping,
     getGithubToken,
@@ -30,13 +31,24 @@
     type UnmappedInputCache,
   } from '../lib/storage';
   import type { WorklogEntry } from '../lib/aggregator';
-  import type { CalendarEvent } from '../lib/calendar-client';
+  import {
+    calendarMeetingsToMap,
+    claudeMeetingId,
+    claudeMeetingsToMap,
+    isMatchedBy,
+    type MeetingToMap,
+  } from '../lib/meetings-to-map';
+  import type { MeetingMapping } from '../types';
   import { SessionExpiredError, type AuthService } from '../lib/http';
   import { JIRA_BASE_URL, CALENDAR_BASE_URL } from '../lib/config';
   import { getMyself } from '../lib/jira-client';
   import { isEmailGated } from '../lib/captcha-gate';
   import CaptchaGate from '../components/CaptchaGate.svelte';
   import { theme, applyThemeClass } from '../lib/theme.svelte';
+
+  // Not key-shaped, so an empty ticket box cannot pass for a filled one.
+  const MISSING_TICKET_PLACEHOLDER = 'pick ticket';
+  const JIRA_KEY_PATTERN = /^[A-Z][A-Z0-9]+-\d+$/;
 
   type RowState = {
     entry: WorklogEntry;
@@ -52,7 +64,7 @@
   };
 
   type UnmappedRow = {
-    event: CalendarEvent;
+    meeting: MeetingToMap;
     jiraInput: string;
     matchInput: string;
     skipInput: boolean;
@@ -189,7 +201,7 @@
     }
     const cache: UnmappedInputCache = {};
     for (const u of unmapped) {
-      cache[u.event.id] = {
+      cache[u.meeting.id] = {
         jiraInput: u.jiraInput,
         matchInput: u.matchInput,
         skipInput: u.skipInput,
@@ -314,16 +326,17 @@
     // Preserve any inputs the user has already typed: check in-memory state
     // first (handles save-one-by-one reset), then session storage (handles
     // popup close/reopen).
-    const currentInputs = new Map(unmapped.map((u) => [u.event.id, u]));
-    unmapped = p.unmapped.map((ev) => {
-      const cur = currentInputs.get(ev.id);
+    const currentInputs = new Map(unmapped.map((u) => [u.meeting.id, u]));
+    const meetings = p.isFromClaude ? claudeMeetingsToMap(p.entries) : calendarMeetingsToMap(p.unmapped);
+    unmapped = meetings.map((meeting) => {
+      const cur = currentInputs.get(meeting.id);
       if (cur) return { ...cur, saving: false };
-      const ses = sessionUnmappedInputs[ev.id];
-      if (ses) return { event: ev, ...ses, saving: false };
+      const ses = sessionUnmappedInputs[meeting.id];
+      if (ses) return { meeting, ...ses, saving: false };
       return {
-        event: ev,
+        meeting,
         jiraInput: '',
-        matchInput: deriveMatchSuggestion(ev.title),
+        matchInput: deriveMatchSuggestion(meeting.title),
         skipInput: false,
         saving: false,
       };
@@ -432,27 +445,54 @@
     await runLoad(async () => loadClaudePreview(await getClaudeTimesheet(sheet.from, sheet.to)));
   }
 
+  function mappingFromInputs(row: UnmappedRow): MeetingMapping | null {
+    const match = row.matchInput.trim();
+    if (!match) return null;
+    if (row.skipInput) return { match, jiraKey: '', skip: true };
+    const jiraKey = row.jiraInput.trim().toUpperCase();
+    return JIRA_KEY_PATTERN.test(jiraKey) ? { match, jiraKey } : null;
+  }
+
   async function saveMapping(row: UnmappedRow) {
     if (!preview) return;
-    const match = row.matchInput.trim();
-    if (!match) return;
-    if (!row.skipInput) {
-      const jira = row.jiraInput.trim().toUpperCase();
-      if (!/^[A-Z][A-Z0-9]+-\d+$/.test(jira)) return;
-      row.saving = true;
-      await addUserMeetingMapping({ match, jiraKey: jira });
-    } else {
-      row.saving = true;
-      await addUserMeetingMapping({ match, jiraKey: '', skip: true });
+    const mapping = mappingFromInputs(row);
+    if (!mapping) return;
+    row.saving = true;
+    await addUserMeetingMapping(mapping);
+    if (preview.isFromClaude) applyMappingToClaudeRows(mapping);
+    else await reaggregateWithNewMapping(preview);
+    if (claudeTimesheets !== null) void syncSettingsToClaude();
+  }
+
+  // A Claude timesheet cannot be re-aggregated here, so the new mapping is applied to the rows it already has;
+  // Claude's next build redistributes the time of a skipped meeting.
+  function applyMappingToClaudeRows(mapping: MeetingMapping) {
+    for (const r of rows) {
+      const title = r.entry.sourceInfo.eventTitle;
+      if (r.entry.source !== 'claude' || !title || !isMatchedBy(title, mapping.match)) continue;
+      if (mapping.skip) r.include = false;
+      else r.entry.issueKey = mapping.jiraKey;
     }
+    unmapped = unmapped.filter((u) => !isMatchedBy(u.meeting.title, mapping.match));
+  }
+
+  // A ticket picked on a meeting row is the likely mapping, so the map form offers it.
+  function offerRowTicketForMapping(entry: WorklogEntry, ticket: string) {
+    const title = entry.sourceInfo.eventTitle;
+    if (!title) return;
+    const row = unmapped.find((u) => u.meeting.id === claudeMeetingId(title));
+    if (row && !row.skipInput) row.jiraInput = ticket;
+  }
+
+  async function reaggregateWithNewMapping(current: LoadedPreview) {
     const fresh = await reaggregate(
-      preview.cachedFetch,
-      preview.existingWorklogs,
-      preview.dateFrom,
-      preview.dateTo,
+      current.cachedFetch,
+      current.existingWorklogs,
+      current.dateFrom,
+      current.dateTo,
     );
     preview = {
-      ...preview,
+      ...current,
       entries: fresh.entries,
       unmapped: fresh.unmapped,
       skippedAllDay: fresh.skippedAllDay,
@@ -460,7 +500,6 @@
       alreadyLoggedIds: fresh.alreadyLoggedIds,
     };
     rebuildRows(preview);
-    if (claudeTimesheets !== null) void syncSettingsToClaude();
   }
 
   async function post() {
@@ -557,12 +596,14 @@
       if (r.postStatus === 'fail') return 'bg-neon-red-bg border-neon-red';
       if (r.postStatus === 'posting') return 'bg-neon-blue-bg border-neon-blue';
       if (r.alreadyLogged) return 'bg-retro-bg border-retro-border opacity-60';
+      if (isMissingTicket(r)) return 'bg-retro-surface2 border-neon-yellow border-l-4';
       return 'bg-retro-surface2 border-retro-border';
     }
     if (r.postStatus === 'ok') return 'bg-green-50 border-green-200';
     if (r.postStatus === 'fail') return 'bg-red-50 border-red-200';
     if (r.postStatus === 'posting') return 'bg-blue-50 border-blue-100';
     if (r.alreadyLogged) return 'bg-slate-50 border-slate-100 opacity-60';
+    if (isMissingTicket(r)) return 'bg-white border-amber-400 border-l-4';
     return 'bg-white border-slate-100';
   }
 
@@ -571,17 +612,17 @@
     return theme.neon ? neonClass : baseClass;
   }
 
+  function isPendingPost(r: RowState): boolean {
+    return r.include && !r.alreadyLogged && r.postStatus !== 'ok';
+  }
+
   // post() skips rows without a ticket, so they must not count as ready to post.
-  let toPostRows = $derived(
-    rows.filter(
-      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok' && !!r.entry.issueKey,
-    ),
-  );
-  let needsTicketCount = $derived(
-    rows.filter(
-      (r) => r.include && !r.alreadyLogged && r.postStatus !== 'ok' && !r.entry.issueKey,
-    ).length,
-  );
+  function isMissingTicket(r: RowState): boolean {
+    return isPendingPost(r) && !r.entry.issueKey;
+  }
+
+  let toPostRows = $derived(rows.filter((r) => isPendingPost(r) && !!r.entry.issueKey));
+  let needsTicketCount = $derived(rows.filter(isMissingTicket).length);
   let toPostCount = $derived(toPostRows.length);
   let toPostMinutes = $derived(
     toPostRows.reduce((sum, r) => sum + (r.entry.minutes || 0), 0),
@@ -899,9 +940,12 @@
                   value={r.entry.issueKey ?? ''}
                   onchange={(v) => {
                     r.entry.issueKey = v;
+                    offerRowTicketForMapping(r.entry, v);
                   }}
                   favorites={preview?.favorites ?? []}
                   disabled={posting || r.postStatus === 'ok'}
+                  placeholder={MISSING_TICKET_PLACEHOLDER}
+                  isMissing={isMissingTicket(r)}
                 />
               </div>
             {:else}
@@ -1013,6 +1057,9 @@
               {r.entry.sourceInfo.claudeNote}
             </div>
           {/if}
+          {#if r.entry.source === 'claude' && r.entry.sourceInfo.claudeEvidence}
+            <ClaudeEvidence evidence={r.entry.sourceInfo.claudeEvidence} />
+          {/if}
           </div>
           {/each}
         {/each}
@@ -1025,15 +1072,16 @@
           </div>
           <div class="text-[10px] {n('text-neon-yellow opacity-80', 'text-amber-600')} mb-2">
             Edit the match text to control future auto-mapping (substring, case-insensitive). Longest match wins.
+            {#if preview?.isFromClaude}Claude's next timesheet uses it too.{/if}
           </div>
           <div class="space-y-1.5">
-            {#each unmapped as u (u.event.id)}
+            {#each unmapped as u (u.meeting.id)}
               <div class="{n('bg-retro-surface2 border border-neon-yellow/40', 'bg-white border border-amber-100')} rounded-lg p-2">
-                <div class="text-xs {n('text-retro-bright', 'text-slate-800')} font-medium truncate" title={u.event.title}>
-                  {u.event.title}
+                <div class="text-xs {n('text-retro-bright', 'text-slate-800')} font-medium truncate" title={u.meeting.title}>
+                  {u.meeting.title}
                 </div>
                 <div class="text-[10px] {n('text-retro-dim', 'text-slate-500')} mb-1.5">
-                  {new Date(u.event.startMs).toLocaleString()} · {u.event.durationMinutes}m
+                  {u.meeting.whenLabel}
                 </div>
                 <div class="flex gap-1.5 items-center">
                   <input
@@ -1062,10 +1110,7 @@
                   </label>
                   <button
                     class="px-2 py-1 {n('bg-neon-orange hover:bg-neon-orange-dark disabled:bg-retro-border2', 'bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400')} text-white text-[11px] rounded-md shrink-0 transition-colors"
-                    disabled={u.saving ||
-                      !u.matchInput.trim() ||
-                      (!u.skipInput &&
-                        !/^[A-Z][A-Z0-9]+-\d+$/i.test(u.jiraInput.trim()))}
+                    disabled={u.saving || mappingFromInputs(u) === null}
                     onclick={() => saveMapping(u)}
                   >
                     {u.saving ? '…' : 'Save'}
@@ -1096,7 +1141,7 @@
               Nothing to post — check entries above
             {/if}
             {#if needsTicketCount > 0}
-              <span class="ml-1 {n('text-neon-red', 'text-amber-600')}">· {needsTicketCount} need a ticket</span>
+              <span class="ml-1 {n('text-neon-yellow', 'text-amber-600')}">· {needsTicketCount} need a ticket</span>
             {/if}
           </div>
         {/if}

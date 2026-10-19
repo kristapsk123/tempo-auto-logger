@@ -21,7 +21,7 @@
     importAllSettings,
   } from '../lib/storage';
   import { aggregate } from '../lib/aggregator';
-  import { loadFavorites, type JiraIssueOption } from '../lib/orchestrator';
+  import { loadFavorites, syncClaudeSettingsIfInstalled, type JiraIssueOption } from '../lib/orchestrator';
   import JiraPicker from '../components/JiraPicker.svelte';
   import type {
     AttendanceFilter,
@@ -152,8 +152,14 @@
     setTimeout(() => setter(false), 1500);
   }
 
+  // The Claude plugin gets these settings at once instead of on the next popup open.
+  function syncToClaude() {
+    syncClaudeSettingsIfInstalled().catch((e) => console.error('Could not sync settings to the Claude plugin', e));
+  }
+
   async function saveAttendance() {
     await setAttendanceFilter(attendanceFilter);
+    syncToClaude();
     flash((v) => (attendanceSavedFlash = v));
   }
 
@@ -211,6 +217,7 @@
       skip: r.skip === true ? true : undefined,
     }));
     await replaceUserMeetingMappings(normalized);
+    syncToClaude();
     mappingsDirty = false;
     flash((v) => (mappingsSavedFlash = v));
   }
@@ -241,6 +248,7 @@
       await setFallbackCommitJira(trimmed);
       fallbackCommitJira = trimmed;
     }
+    syncToClaude();
     flash((v) => (fallbackCommitJiraSavedFlash = v));
   }
 
@@ -323,6 +331,7 @@
           return;
         }
         await importAllSettings(parsed);
+        syncToClaude();
         flash((v) => (importedFlash = v));
         setTimeout(() => window.location.reload(), 1600);
       } catch (e) {

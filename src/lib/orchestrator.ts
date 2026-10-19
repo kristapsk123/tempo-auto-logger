@@ -12,7 +12,13 @@ import {
 } from './jira-client';
 
 export type { JiraIssueOption } from './jira-client';
-import type { ClaudeSettingsSnapshot, ClaudeTimesheet, ClaudeTimesheetEntry } from './claude-timesheet-client';
+import {
+  isHostMissingError,
+  syncClaudeSettings,
+  type ClaudeSettingsSnapshot,
+  type ClaudeTimesheet,
+  type ClaudeTimesheetEntry,
+} from './claude-timesheet-client';
 import type { MeetingMapping } from '../types';
 import {
   createWorklog,
@@ -65,6 +71,7 @@ export interface LoadedPreview {
   jiraWorker: { name: string; key: string };
   favorites: JiraIssueOption[];
   cachedFetch: CachedFetch;
+  isFromClaude: boolean;
 }
 
 export type ReaggregatedPreview = Pick<
@@ -170,6 +177,7 @@ export async function loadPreview(
     jiraWorker: { name: me.name, key: me.key },
     favorites,
     cachedFetch: { commits, reviews, events, timeZone },
+    isFromClaude: false,
   };
 }
 
@@ -185,7 +193,11 @@ function toClaudeEntry(entry: ClaudeTimesheetEntry, index: number): WorklogEntry
     comment: entry.comment,
     source: 'claude',
     include: true,
-    sourceInfo: entry.note ? { claudeNote: entry.note } : {},
+    sourceInfo: {
+      ...(entry.note ? { claudeNote: entry.note } : {}),
+      ...(entry.meeting?.title ? { eventTitle: entry.meeting.title } : {}),
+      ...(entry.evidence ? { claudeEvidence: entry.evidence } : {}),
+    },
   };
 }
 
@@ -223,6 +235,7 @@ export async function loadClaudePreview(timesheet: ClaudeTimesheet): Promise<Loa
       events: [],
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Europe/Riga',
     },
+    isFromClaude: true,
   };
 }
 
@@ -239,6 +252,16 @@ export async function collectClaudeSettings(): Promise<ClaudeSettingsSnapshot> {
     attendanceFilter,
     fallbackCommitJira,
   };
+}
+
+// Teammates without the Claude plugin have no host, so for them there is nothing to sync.
+export async function syncClaudeSettingsIfInstalled(): Promise<void> {
+  try {
+    await syncClaudeSettings(await collectClaudeSettings());
+  } catch (e) {
+    if (isHostMissingError(e)) return;
+    throw e;
+  }
 }
 
 export async function loadFavorites(): Promise<JiraIssueOption[]> {

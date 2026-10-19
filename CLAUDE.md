@@ -96,6 +96,8 @@ src/
   components/
     JiraPicker.svelte       Reusable combobox for picking Jira keys
                             with favorites / recent issues dropdown
+    ClaudeEvidence.svelte   Commits, PR links and Slack conversations
+                            behind a Claude row, expandable under it
   lib/
     config.ts               Base URLs
     http.ts                 jiraFetch() helper, SessionExpiredError
@@ -114,6 +116,8 @@ src/
     claude-timesheet-client.ts  Native messaging client for the Claude Code timesheet
                             host (list and get rendered Claude timesheets,
                             sync mapping settings)
+    meetings-to-map.ts      Meetings the popup's map form offers, from the
+                            calendar preview or a Claude timesheet
     aggregator.ts           Pure function: (commits, reviews, events,
                             mappings, settings) -> WorklogEntry[]
                             + signature tagging for dedupe
@@ -194,14 +198,29 @@ These were agreed with the user; don't relitigate unless they ask:
   timesheets; loading one replaces the preview with its rows (source
   `claude`, editable like manual rows, deduped against existing Tempo
   worklogs by `loadClaudePreview`). Rows without a ticket are ones Claude
-  could not resolve; the user assigns them. The popup also syncs the user
+  could not resolve; the user assigns them. An included, unposted row
+  without a ticket gets a yellow (neon) or amber left bar and a dashed
+  `pick ticket` box, because the picker's `NUMO-1234` placeholder looked
+  like a real key; Post skips such rows. The popup also syncs the user
   and team meeting mappings, the attendance filter and the fallback commit
-  Jira to the host on every open and after saving a mapping, so the skill
-  maps and skips meetings the same way. The host never posts; the user
+  Jira to the host on every open and after saving a mapping, and Settings
+  syncs whenever those are saved or imported, so the skill maps and skips
+  meetings the same way. A meeting row without a ticket carries its
+  meeting title, and the popup lists those meetings in the same "Map
+  meetings to Jira" form as the calendar flow, one form per title. Saving
+  adds a user mapping and applies it to the loaded rows (a ticket fills
+  matching rows, Skip unticks them), because a Claude timesheet cannot be
+  re-aggregated in the popup; Claude's next build uses the mapping. A
+  ticket picked on such a row is offered in its form. The host never posts; the user
   reviews and presses Post. Without the host the section stays hidden.
   Day headers show hours already in Tempo for that date. Each Claude row
   can carry a note (where its hours came from, what it was about), shown
-  in a purple box under the row and never posted. The popup re-reads the
+  in a purple box under the row and never posted. Under the note, buttons
+  expand the commits behind the row (hash opens the commit on GitHub), open
+  each reviewed PR, and expand the row's Slack conversations that day,
+  other people's messages included; only `https://github.com/` links are
+  opened, and a link is missing when the plugin does not know the repo's
+  GitHub address. The popup re-reads the
   Claude timesheet list whenever its window gets focus, so a timesheet
   rendered while the popup is open appears without reopening it.
 - **Manual entries:** the popup has an "+ Add manual entry" button that
@@ -303,7 +322,11 @@ The client is
     entryCount, totalMinutes }] }`, newest first, at most 10.
   - `{ type: "getTimesheet", from, to }` returns `{ ok: true, timesheet }` where `timesheet` is
     `{ format: "tempo-auto-logger/claude-v1", from, to, renderedAt, entries: [{ date,
-    issueKey: string | null, minutes, comment, note? }] }`. `note` is shown, never posted.
+    issueKey: string | null, minutes, comment, note?, meeting?: { title }, evidence? }] }`. `note`
+    is shown, never posted; `meeting` is set on a meeting row without a ticket; `evidence` holds
+    `commits` (time, repo, hash, subject, url?), `pullRequests` (repo, number, title, url?),
+    `messages` (time, channel, author?, isOwn, text) and `omittedMessageCount?`, each only when
+    non-empty.
   - `{ type: "syncSettings", settings: { userMeetingMappings, teamMeetingMappings,
     attendanceFilter, fallbackCommitJira } }` returns `{ ok: true, syncedAt }`. The plugin builds
     with these exactly like `aggregator.findMapping` and `shouldIncludeByAttendance`.

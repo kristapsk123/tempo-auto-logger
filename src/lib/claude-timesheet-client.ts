@@ -20,12 +20,45 @@ export interface ClaudeTimesheetSummary {
   totalMinutes: number;
 }
 
+export interface ClaudeCommit {
+  time: string;
+  repo: string;
+  hash: string;
+  subject: string;
+  url?: string;
+}
+
+export interface ClaudePullRequest {
+  repo: string;
+  number: number;
+  title: string;
+  url?: string;
+}
+
+export interface ClaudeMessage {
+  time: string;
+  channel: string;
+  author?: string;
+  isOwn: boolean;
+  text: string;
+}
+
+export interface ClaudeRowEvidence {
+  commits?: ClaudeCommit[];
+  pullRequests?: ClaudePullRequest[];
+  messages?: ClaudeMessage[];
+  omittedMessageCount?: number;
+}
+
 export interface ClaudeTimesheetEntry {
   date: string;
   issueKey: string | null;
   minutes: number;
   comment: string;
   note?: string;
+  // Set on a meeting row without a ticket, so the popup can offer to map that meeting.
+  meeting?: { title: string };
+  evidence?: ClaudeRowEvidence;
 }
 
 export interface ClaudeTimesheet {
@@ -41,6 +74,10 @@ export interface ClaudeSettingsSnapshot {
   teamMeetingMappings: MeetingMapping[];
   attendanceFilter: AttendanceFilter;
   fallbackCommitJira: string | null;
+}
+
+export function isHostMissingError(error: unknown): boolean {
+  return error instanceof Error && HOST_NOT_FOUND_PATTERN.test(error.message);
 }
 
 type HostResponse<T> = ({ ok: true } & T) | { ok: false; error: string };
@@ -64,7 +101,7 @@ export async function listClaudeTimesheets(): Promise<ClaudeTimesheetSummary[] |
     if (!response.ok) throw new Error(response.error);
     return response.timesheets;
   } catch (e) {
-    if (e instanceof Error && HOST_NOT_FOUND_PATTERN.test(e.message)) return null;
+    if (isHostMissingError(e)) return null;
     throw e;
   }
 }
