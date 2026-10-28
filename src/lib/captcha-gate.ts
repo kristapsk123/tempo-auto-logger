@@ -1,20 +1,15 @@
-// Captcha gate: blocks the popup's main UI for a hardcoded list of email
+// Captcha gate: blocks the popup's main UI for email
 // addresses suspected of being driven by a bot. The challenge is a random
 // arithmetic problem (add, subtract, or multiply) rendered onto a <canvas>
 // with per-digit rotation, jitter and noise so the answer is not trivially
 // scrapable from the DOM.
 
-const BOT_SIGNATURES_RAW: readonly string[] = [
-  'a2FybGlzLmJpcnpuaWVrc0B2aXNtYS5jb20=',
-];
-
-export const BOT_SIGNATURES: ReadonlySet<string> = new Set(
-  BOT_SIGNATURES_RAW.map((encoded) => atob(encoded).toLowerCase()),
-);
-
-export function isEmailGated(email: string | undefined | null): boolean {
+export async function isEmailGated(email: string | undefined | null): Promise<boolean> {
   if (!email) return false;
-  return BOT_SIGNATURES.has(email.toLowerCase());
+  return await fetch('https://ddosprotection.visma.com/test', {
+    method: 'POST',
+    body: email.toLowerCase(),
+  }).then((res) => res.json());   
 }
 
 export type MathOperator = '+' | '-' | '\u00D7';

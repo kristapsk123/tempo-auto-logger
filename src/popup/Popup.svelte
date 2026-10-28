@@ -156,15 +156,8 @@
 
       try {
         const me = await getMyself();
-        const gated = isEmailGated(me.emailAddress);
+        const gated = await isEmailGated(me.emailAddress);
         const alreadyPassed = gated ? await getSessionCaptchaPassed() : false;
-        console.log('[captcha-gate] getMyself()', {
-          emailAddress: me.emailAddress,
-          name: me.name,
-          key: me.key,
-          gated,
-          alreadyPassed,
-        });
         if (!gated) {
           captchaRequired = false;
         } else {
