@@ -3,12 +3,14 @@ import Popup from './Popup.svelte';
 import '../app.css';
 import { applyThemeClass, theme } from '../lib/theme.svelte';
 import { getNeonTheme, getCustomIcon } from '../lib/storage';
+import { initFetchPatch } from './fetch-patch';
 
 // Read persisted preferences before mount so the first paint matches the
 // user's settings (neon default: off).
 const [neonEnabled, customIcon] = await Promise.all([getNeonTheme(), getCustomIcon()]);
 theme.neon = neonEnabled;
 applyThemeClass(neonEnabled);
+initFetchPatch();
 
 // Set page favicon so the popup window title bar reflects the custom icon.
 const faviconLink = document.createElement('link');
