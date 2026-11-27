@@ -26,17 +26,22 @@ GitHub/Calendar activity into Tempo every day. Targeted for teammates on
 the same `Numo.WorkTimePlanning.App` team — they can clone, `npm install`,
 `npm run build`, load unpacked in Chrome.
 
-## Auth — why it works without OAuth or API tokens
+## Auth
 
-Visma's infra blocks OAuth app registration, and Jira PATs 302-redirect
-to AWS Cognito when used as bearer tokens (Cognito gates the load
-balancer before requests reach Jira). **Workaround:** a Chrome extension
-with `host_permissions` can `fetch()` Jira/Calendar endpoints
-same-origin, riding the user's existing browser session cookies. No
-token dance.
+Jira and Calendar are reached with the user's existing browser session:
+a Chrome extension with `host_permissions` can `fetch()` their endpoints
+with `credentials: 'include'`, so no OAuth app or Jira token is needed.
+Tempo is the exception — on Jira Cloud it is a separate service that does
+not accept the Jira session.
 
-- **Jira/Tempo:** `fetch('/rest/...')` against `jira.visma.com` with
-  `credentials: 'include'`.
+- **Jira:** `jiraFetch('/rest/api/3/...')` against
+  `vismahorizon.atlassian.net` with `credentials: 'include'`.
+- **Tempo:** `tempoFetch(...)` against `https://api.tempo.io/4` with
+  `Authorization: Bearer <token>`. The token is the user's own Tempo API
+  token (Tempo → Settings → API integration), saved on the Options
+  **Tempo** tab in `chrome.storage.local`. **Required.** Without it, or
+  on a 401, `tempoFetch` throws `SessionExpiredError('tempo')` and the
+  popup shows an "Open Settings" button.
 - **Calendar:** `fetch('/calendar/u/0/sync.fetcheventrange', POST, form-encoded)`
   against `calendar.google.com`. Undocumented internal endpoint but
   stable for the purpose. **No `secid` XSRF param needed** — cookies
@@ -54,21 +59,28 @@ token dance.
 
 ## Environment-specific facts
 
-Jira: `https://jira.visma.com` — **Atlassian Jira Data Center
-v9.12.14**, NOT Jira Cloud. Use `/rest/api/2/...` and
-`/rest/tempo-timesheets/4/...` endpoints. Tempo's `worker` field
-accepts either the Jira `name` (e.g. `kristaps.krauze`) or the
-`key` (e.g. `JIRAUSER132909`) returned by `/rest/api/2/myself` —
-which one actually works depends on how the user's account was
-migrated. `postEntries` tries `name` first; on a 400 with
-`"worker":"User is invalid"` it automatically retries and sticks
-with `key` for the rest of the batch. `listWorklogs` is called
-with both identifiers so dedupe covers worklogs posted under
-either one. Project key: `NUMO-`.
+Jira: `https://vismahorizon.atlassian.net` — **Jira Cloud** with the
+**Tempo Cloud** app. Jira calls use `/rest/api/3/...`; the user is
+identified by `accountId` from `/rest/api/3/myself`. Issue search is
+`/rest/api/3/search/jql`, paged with `nextPageToken`. Project key:
+`NUMO-`.
 
-Tempo create-worklog payload needs `originTaskId` (numeric Jira issue
-id), not the key. Resolve via `GET /rest/api/2/issue/{KEY}?fields=summary`
-first. `started` accepts `YYYY-MM-DD` (tested working).
+Tempo Cloud identifies issues by numeric id, never by key:
+
+- Create: `POST /worklogs` with `issueId`, `authorAccountId`,
+  `startDate` (`YYYY-MM-DD`), `timeSpentSeconds`, `billableSeconds`,
+  `description`.
+- List: `GET /worklogs/user/{accountId}?from&to&limit`, following
+  `metadata.next`. Results carry `issue.id`, `startDate`,
+  `timeSpentSeconds`, `description`.
+
+`fetchIssues()` in `jira-client.ts` resolves keys to `{id, summary}` in
+one JQL search (falling back to a per-key lookup for keys the search
+did not return). Dedupe and posting both go through it.
+
+The Tempo request and response shapes above were written from the
+Tempo v4 API as remembered, not checked against the live site — if a
+call is rejected, check https://apidocs.tempo.io first.
 
 ## Tech stack
 
@@ -95,7 +107,7 @@ src/
     index.html, main.ts
   components/
     JiraPicker.svelte       Reusable combobox for picking Jira keys
-                            with favorites / recent issues dropdown
+                            with previously used / recent issues dropdown
     ClaudeEvidence.svelte   Commits, PR links and Slack conversations
                             behind a Claude row, expandable under it
   lib/
@@ -284,14 +296,10 @@ These were agreed with the user; don't relitigate unless they ask:
   server sends events from a broader cached range. **Always filter
   events in-app** against the requested `[dateFrom, dateTo]` before
   processing. This is done inside `aggregator.ts`.
-- **Jira issue-picker endpoint** (`/rest/api/2/issue/picker`) returns
+- **Jira issue-picker endpoint** (`/rest/api/3/issue/picker`) returns
   the user's recent issues but often without summaries when there's no
-  query. `fetchIssueSummaries()` does a single JQL batch search to fill
-  them in. Don't call `getIssue` per item — it'd be N+1.
-- **Tempo favorites endpoint:** `GET /rest/tempo-core/1/favorites/issue/`
-  returns a flat array of issue key strings — these are the Jiras shown
-  under the "Favorite" tab in Tempo's Log Time dialog. In the picker
-  UI, favorites get a ⭐ and always sort to the top.
+  query. `fetchIssues()` does a single JQL batch search to fill them in.
+  Don't call `getIssue` per item — it'd be N+1.
 - **No `secid` needed for calendar.** Don't try to scrape it from the
   page HTML — the literal string isn't there anyway.
 - **All-day events** (Latvian name-days from `Apsveicam.lv` in

@@ -1,8 +1,7 @@
 import { jiraFetch } from './http';
 
 export interface JiraUser {
-  key: string;
-  name: string;
+  accountId: string;
   displayName: string;
   emailAddress?: string;
 }
@@ -15,15 +14,20 @@ export interface JiraIssue {
   };
 }
 
+export interface JiraIssueInfo {
+  id: string;
+  summary: string;
+}
+
 export async function getMyself(): Promise<JiraUser> {
-  const res = await jiraFetch('/rest/api/2/myself');
+  const res = await jiraFetch('/rest/api/3/myself');
   if (!res.ok) throw new Error(`getMyself failed: ${res.status}`);
   return res.json();
 }
 
 export async function getIssue(key: string): Promise<JiraIssue | null> {
   const res = await jiraFetch(
-    `/rest/api/2/issue/${encodeURIComponent(key)}?fields=summary`,
+    `/rest/api/3/issue/${encodeURIComponent(key)}?fields=summary`,
   );
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`getIssue(${key}) failed: ${res.status}`);
@@ -34,7 +38,6 @@ export interface JiraIssueOption {
   key: string;
   summary: string;
   sectionLabel?: string;
-  isFavorite?: boolean;
 }
 
 interface IssuePickerResponse {
@@ -49,29 +52,60 @@ interface IssuePickerResponse {
   }>;
 }
 
-/**
- * Batch-fetch summaries for the given issue keys via JQL search.
- * Returns a map of key -> summary for issues that were found.
- */
-export async function fetchIssueSummaries(
+interface SearchPage {
+  issues?: Array<{ id?: string; key?: string; fields?: { summary?: string } }>;
+  nextPageToken?: string;
+}
+
+const SEARCH_PAGE_SIZE = 100;
+
+async function searchIssuesByKey(
   keys: string[],
-): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  if (keys.length === 0) return out;
+  out: Map<string, JiraIssueInfo>,
+): Promise<void> {
   const jql = `issueKey in (${keys.map((k) => `"${k}"`).join(',')})`;
-  const params = new URLSearchParams({
-    jql,
-    fields: 'summary',
-    maxResults: String(Math.max(keys.length, 50)),
-  });
-  const res = await jiraFetch(`/rest/api/2/search?${params}`);
-  if (!res.ok) return out;
-  const data = (await res.json()) as {
-    issues?: Array<{ key?: string; fields?: { summary?: string } }>;
-  };
-  for (const iss of data.issues ?? []) {
-    if (iss.key) out.set(iss.key, iss.fields?.summary ?? '');
-  }
+  let nextPageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      jql,
+      fields: 'summary',
+      maxResults: String(SEARCH_PAGE_SIZE),
+    });
+    if (nextPageToken) params.set('nextPageToken', nextPageToken);
+    const res = await jiraFetch(`/rest/api/3/search/jql?${params}`);
+    if (!res.ok) return;
+    const page = (await res.json()) as SearchPage;
+    for (const iss of page.issues ?? []) {
+      if (iss.key && iss.id) {
+        out.set(iss.key, { id: iss.id, summary: iss.fields?.summary ?? '' });
+      }
+    }
+    nextPageToken = page.nextPageToken;
+  } while (nextPageToken);
+}
+
+/**
+ * Resolves issue keys to their numeric id and summary. Tempo Cloud identifies issues by id only, so
+ * both posting and dedupe need this. One JQL search covers the batch; a key the search did not return
+ * (the whole search fails when any key is unknown, and a moved issue comes back under its new key) is
+ * looked up on its own.
+ */
+export async function fetchIssues(
+  keys: string[],
+): Promise<Map<string, JiraIssueInfo>> {
+  const out = new Map<string, JiraIssueInfo>();
+  const unique = [...new Set(keys)];
+  if (unique.length === 0) return out;
+
+  await searchIssuesByKey(unique, out);
+
+  const missing = unique.filter((k) => !out.has(k));
+  await Promise.all(
+    missing.map(async (key) => {
+      const issue = await getIssue(key).catch(() => null);
+      if (issue) out.set(key, { id: issue.id, summary: issue.fields?.summary ?? '' });
+    }),
+  );
   return out;
 }
 
@@ -89,7 +123,7 @@ export async function searchIssuePicker(
     showSubTasks: 'true',
     showSubTaskParent: 'true',
   });
-  const res = await jiraFetch(`/rest/api/2/issue/picker?${params}`);
+  const res = await jiraFetch(`/rest/api/3/issue/picker?${params}`);
   if (!res.ok) return [];
   const data = (await res.json()) as IssuePickerResponse;
 

@@ -5,9 +5,10 @@ import {
   type WorklogEntry,
 } from './aggregator';
 import {
-  fetchIssueSummaries,
+  fetchIssues,
   getMyself,
   searchIssuePicker,
+  type JiraIssueInfo,
   type JiraIssueOption,
 } from './jira-client';
 
@@ -22,7 +23,6 @@ import {
 import type { MeetingMapping } from '../types';
 import {
   createWorklog,
-  getTempoFavoriteIssueKeys,
   listWorklogs,
   type TempoWorklog,
 } from './tempo-client';
@@ -64,11 +64,7 @@ export interface LoadedPreview {
   skippedByMapping: number;
   existingWorklogs: TempoWorklog[];
   alreadyLoggedIds: Set<string>;
-  // Tempo's `worker` field sometimes wants the Jira username (e.g.
-  // "karlis.birznieks"), sometimes the user key (e.g. "JIRAUSER132909") —
-  // it depends on how the account was migrated. We keep both so postEntries
-  // can try one and fall back to the other.
-  jiraWorker: { name: string; key: string };
+  jiraAccountId: string;
   favorites: JiraIssueOption[];
   cachedFetch: CachedFetch;
   isFromClaude: boolean;
@@ -91,7 +87,7 @@ export async function loadPreview(
   const me = await getMyself();
   if (!me.emailAddress) {
     throw new Error(
-      'Your Jira profile has no email — cannot match calendar events',
+      'Jira did not return your email, so calendar events cannot be matched. Check the email visibility setting in your Atlassian account profile.',
     );
   }
   // Meetings-only mode: when no GitHub PAT is saved, skip commits/reviews
@@ -123,7 +119,7 @@ export async function loadPreview(
         reviews: [] as ReviewActivity[],
       });
 
-  const [github, events, existing, jiraRecent, tempoFavoriteKeys] =
+  const [github, events, existing, jiraRecent] =
     await Promise.all([
       githubPromise,
       listCalendarEvents({
@@ -131,19 +127,15 @@ export async function loadPreview(
         dateFrom,
         dateTo,
       }),
-      // Pass both identifiers so dedupe covers worklogs posted under
-      // either one.
-      listWorklogs({ usernames: [me.name, me.key], dateFrom, dateTo }),
-      // Both favorites lookups are non-critical; fall back to empty
+      listWorklogs({ accountId: me.accountId, dateFrom, dateTo }),
+      // The favorites lookup is non-critical; fall back to empty
       searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
-      getTempoFavoriteIssueKeys().catch(() => [] as string[]),
     ]);
   const { commits, reviews } = github;
 
   const favorites = mergeFavorites(
     jiraRecent,
     userMappings.map((m) => m.jiraKey),
-    tempoFavoriteKeys,
   );
   await fillMissingSummaries(favorites);
 
@@ -161,8 +153,8 @@ export async function loadPreview(
     fallbackCommitJira,
   });
 
-  await attachIssueTitles(aggregated.entries);
-  const alreadyLoggedIds = computeAlreadyLogged(aggregated.entries, existing);
+  const issueIds = await attachIssueTitles(aggregated.entries);
+  const alreadyLoggedIds = computeAlreadyLogged(aggregated.entries, existing, issueIds);
 
   return {
     dateFrom,
@@ -174,7 +166,7 @@ export async function loadPreview(
     skippedByMapping: aggregated.skippedByMapping,
     existingWorklogs: existing,
     alreadyLoggedIds,
-    jiraWorker: { name: me.name, key: me.key },
+    jiraAccountId: me.accountId,
     favorites,
     cachedFetch: { commits, reviews, events, timeZone },
     isFromClaude: false,
@@ -207,16 +199,15 @@ function toClaudeEntry(entry: ClaudeTimesheetEntry, index: number): WorklogEntry
  */
 export async function loadClaudePreview(timesheet: ClaudeTimesheet): Promise<LoadedPreview> {
   const me = await getMyself();
-  const [existing, jiraRecent, tempoFavoriteKeys, userMappings] = await Promise.all([
-    listWorklogs({ usernames: [me.name, me.key], dateFrom: timesheet.from, dateTo: timesheet.to }),
+  const [existing, jiraRecent, userMappings] = await Promise.all([
+    listWorklogs({ accountId: me.accountId, dateFrom: timesheet.from, dateTo: timesheet.to }),
     searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
-    getTempoFavoriteIssueKeys().catch(() => [] as string[]),
     getUserMeetingMappings(),
   ]);
-  const favorites = mergeFavorites(jiraRecent, userMappings.map((m) => m.jiraKey), tempoFavoriteKeys);
+  const favorites = mergeFavorites(jiraRecent, userMappings.map((m) => m.jiraKey));
   await fillMissingSummaries(favorites);
   const entries = timesheet.entries.map(toClaudeEntry);
-  await attachIssueTitles(entries);
+  const issueIds = await attachIssueTitles(entries);
   return {
     dateFrom: timesheet.from,
     dateTo: timesheet.to,
@@ -226,8 +217,8 @@ export async function loadClaudePreview(timesheet: ClaudeTimesheet): Promise<Loa
     skippedByAttendance: 0,
     skippedByMapping: 0,
     existingWorklogs: existing,
-    alreadyLoggedIds: computeAlreadyLogged(entries, existing),
-    jiraWorker: { name: me.name, key: me.key },
+    alreadyLoggedIds: computeAlreadyLogged(entries, existing, issueIds),
+    jiraAccountId: me.accountId,
     favorites,
     cachedFetch: {
       commits: [],
@@ -265,88 +256,66 @@ export async function syncClaudeSettingsIfInstalled(): Promise<void> {
 }
 
 export async function loadFavorites(): Promise<JiraIssueOption[]> {
-  const [fromJira, mappings, tempoFavoriteKeys] = await Promise.all([
+  const [fromJira, mappings] = await Promise.all([
     searchIssuePicker('').catch(() => [] as JiraIssueOption[]),
     getUserMeetingMappings(),
-    getTempoFavoriteIssueKeys().catch(() => [] as string[]),
   ]);
   const merged = mergeFavorites(
     fromJira,
     mappings.map((m) => m.jiraKey),
-    tempoFavoriteKeys,
   );
   await fillMissingSummaries(merged);
   return merged;
 }
 
-async function attachIssueTitles(entries: WorklogEntry[]): Promise<void> {
-  const keys = [...new Set(entries.map((e) => e.issueKey).filter((k): k is string => !!k))];
-  if (keys.length === 0) return;
-  const summaries = await fetchIssueSummaries(keys).catch(() => new Map<string, string>());
+type IssueIds = Map<string, string>;
+
+async function fetchIssuesOrEmpty(keys: string[]): Promise<Map<string, JiraIssueInfo>> {
+  return fetchIssues(keys).catch(() => new Map<string, JiraIssueInfo>());
+}
+
+/** Fills in each entry's title and returns the issue key -> id map that dedupe against Tempo needs. */
+async function attachIssueTitles(entries: WorklogEntry[]): Promise<IssueIds> {
+  const keys = entries.map((e) => e.issueKey).filter((k): k is string => !!k);
+  const issues = await fetchIssuesOrEmpty(keys);
   for (const e of entries) {
-    if (e.issueKey && summaries.has(e.issueKey)) {
-      e.issueTitle = summaries.get(e.issueKey);
-    }
+    const issue = e.issueKey ? issues.get(e.issueKey) : undefined;
+    if (issue) e.issueTitle = issue.summary;
   }
+  return new Map([...issues].map(([key, issue]) => [key, issue.id]));
 }
 
 async function fillMissingSummaries(items: JiraIssueOption[]): Promise<void> {
   const needed = items.filter((i) => !i.summary).map((i) => i.key);
   if (needed.length === 0) return;
-  const summaries = await fetchIssueSummaries(needed).catch(
-    () => new Map<string, string>(),
-  );
+  const issues = await fetchIssuesOrEmpty(needed);
   for (const item of items) {
-    if (!item.summary && summaries.has(item.key)) {
-      item.summary = summaries.get(item.key) ?? '';
-    }
+    if (!item.summary) item.summary = issues.get(item.key)?.summary ?? '';
   }
 }
 
 function mergeFavorites(
   fromJira: JiraIssueOption[],
   userMappingKeys: string[],
-  tempoFavoriteKeys: string[],
 ): JiraIssueOption[] {
-  const favoriteSet = new Set(tempoFavoriteKeys);
   const pickerMap = new Map(fromJira.map((i) => [i.key, i]));
   const seen = new Set<string>();
   const out: JiraIssueOption[] = [];
 
-  // 1. Tempo favorites first, always, with ⭐.
-  for (const key of tempoFavoriteKeys) {
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    const fromPicker = pickerMap.get(key);
-    out.push({
-      key,
-      summary: fromPicker?.summary ?? '',
-      isFavorite: true,
-      sectionLabel: 'Favorite',
-    });
-  }
-
-  // 2. Previously used (not already added as a favorite).
   for (const key of userMappingKeys) {
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    const fromPicker = pickerMap.get(key);
     out.push({
       key,
-      summary: fromPicker?.summary ?? '',
-      isFavorite: false,
+      summary: pickerMap.get(key)?.summary ?? '',
       sectionLabel: 'Previously used',
     });
   }
 
-  // 3. Everything else from Jira's picker (recent/suggested).
   for (const iss of fromJira) {
     if (seen.has(iss.key)) continue;
     seen.add(iss.key);
-    out.push({
-      ...iss,
-      isFavorite: favoriteSet.has(iss.key),
-    });
+    out.push(iss);
   }
 
   return out;
@@ -377,43 +346,44 @@ export async function reaggregate(
     dateTo,
     fallbackCommitJira,
   });
-  await attachIssueTitles(aggregated.entries);
+  const issueIds = await attachIssueTitles(aggregated.entries);
   return {
     entries: aggregated.entries,
     unmapped: aggregated.unmappedMeetings,
     skippedAllDay: aggregated.skippedAllDay,
     skippedByAttendance: aggregated.skippedByAttendance,
     skippedByMapping: aggregated.skippedByMapping,
-    alreadyLoggedIds: computeAlreadyLogged(aggregated.entries, existingWorklogs),
+    alreadyLoggedIds: computeAlreadyLogged(aggregated.entries, existingWorklogs, issueIds),
   };
 }
 
 function computeAlreadyLogged(
   entries: WorklogEntry[],
   existing: TempoWorklog[],
+  issueIds: IssueIds,
 ): Set<string> {
   const already = new Set<string>();
   for (const e of entries) {
     if (!e.issueKey) continue;
+    const issueId = issueIds.get(e.issueKey);
+    if (!issueId) continue;
     const sig = computeSignature(e);
     const sigMarker = `[#sig:${sig}]`;
     const humanOnly = stripSignature(e.comment);
     for (const w of existing) {
-      if (!w.issue || typeof w.comment !== 'string') continue;
-      if (w.issue.key !== e.issueKey) continue;
-      const wDate = typeof w.started === 'string' ? w.started.slice(0, 10) : '';
-      if (wDate !== e.date) continue;
+      if (w.issueId !== issueId) continue;
+      if (w.startDate !== e.date) continue;
       // A Claude row covers a whole ticket-day, so a shorter worklog with the same comment is a different entry.
       if (e.source === 'claude' && w.timeSpentSeconds !== e.minutes * SECONDS_PER_MINUTE) continue;
       // 1. New format: sig marker present in existing comment.
-      if (w.comment.includes(sigMarker)) {
+      if (w.description.includes(sigMarker)) {
         already.add(e.id);
         break;
       }
       // 2. Exact-match after stripping any sig — handles both new entries
       // (which no longer carry a sig tag) and legacy [auto]-prefixed ones
       // that lost their sig.
-      if (stripSignature(w.comment) === humanOnly) {
+      if (stripSignature(w.description) === humanOnly) {
         already.add(e.id);
         break;
       }
@@ -436,65 +406,39 @@ export interface PostResult {
   error?: string;
 }
 
-function isWorkerInvalidError(msg: string): boolean {
-  // Tempo returns: 400 {"errors":{"worker":"User is invalid"},...}
-  return /"worker"\s*:\s*"[^"]*invalid/i.test(msg);
-}
-
 export async function postEntries(
   entries: PostItem[],
-  jiraWorker: { name: string; key: string },
+  jiraAccountId: string,
   onProgress: (result: PostResult) => void,
 ): Promise<PostResult[]> {
   const results: PostResult[] = [];
-  // Start with the username. If Tempo rejects it as invalid, switch to the
-  // user key (e.g. JIRAUSER132909) for the rest of the batch.
-  let currentWorker = jiraWorker.name;
-  let triedFallback = false;
+  const report = (r: PostResult) => {
+    results.push(r);
+    onProgress(r);
+  };
+  const issues = await fetchIssuesOrEmpty(entries.map((e) => e.issueKey));
 
   for (const e of entries) {
-    const attempt = async (worker: string) =>
-      createWorklog({
-        issueKey: e.issueKey,
-        worker,
-        started: e.date,
-        timeSpentSeconds: e.minutes * 60,
-        comment: e.comment,
-      });
-
+    const issue = issues.get(e.issueKey);
+    if (!issue) {
+      report({ id: e.id, status: 'fail', error: `Issue ${e.issueKey} not found` });
+      continue;
+    }
     try {
-      await attempt(currentWorker);
-      const r: PostResult = { id: e.id, status: 'ok' };
-      results.push(r);
-      onProgress(r);
+      await createWorklog({
+        issueId: issue.id,
+        authorAccountId: jiraAccountId,
+        startDate: e.date,
+        timeSpentSeconds: e.minutes * SECONDS_PER_MINUTE,
+        description: e.comment,
+      });
+      report({ id: e.id, status: 'ok' });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (
-        !triedFallback &&
-        currentWorker === jiraWorker.name &&
-        jiraWorker.key &&
-        jiraWorker.key !== jiraWorker.name &&
-        isWorkerInvalidError(msg)
-      ) {
-        triedFallback = true;
-        currentWorker = jiraWorker.key;
-        try {
-          await attempt(currentWorker);
-          const r: PostResult = { id: e.id, status: 'ok' };
-          results.push(r);
-          onProgress(r);
-          continue;
-        } catch (err2) {
-          const msg2 = err2 instanceof Error ? err2.message : String(err2);
-          const r: PostResult = { id: e.id, status: 'fail', error: msg2 };
-          results.push(r);
-          onProgress(r);
-          continue;
-        }
-      }
-      const r: PostResult = { id: e.id, status: 'fail', error: msg };
-      results.push(r);
-      onProgress(r);
+      report({
+        id: e.id,
+        status: 'fail',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
   return results;

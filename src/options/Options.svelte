@@ -3,10 +3,12 @@
     DEFAULT_ATTENDANCE_FILTER,
     clearFallbackCommitJira,
     clearGithubToken,
+    clearTempoToken,
     clearCustomIcon,
     getAttendanceFilter,
     getFallbackCommitJira,
     getGithubToken,
+    getTempoToken,
     getNeonTheme,
     getCustomIcon,
     getUserMeetingMappings,
@@ -15,6 +17,7 @@
     setAttendanceFilter,
     setFallbackCommitJira,
     setGithubToken,
+    setTempoToken,
     setCustomIcon,
     setUserTemplates,
     exportAllSettings,
@@ -22,6 +25,10 @@
   } from '../lib/storage';
   import { aggregate } from '../lib/aggregator';
   import { loadFavorites, syncClaudeSettingsIfInstalled, type JiraIssueOption } from '../lib/orchestrator';
+  import { getMyself } from '../lib/jira-client';
+  import { listWorklogs } from '../lib/tempo-client';
+  import { SessionExpiredError } from '../lib/http';
+  import { JIRA_BASE_URL } from '../lib/config';
   import JiraPicker from '../components/JiraPicker.svelte';
   import type {
     AttendanceFilter,
@@ -35,12 +42,13 @@
 
   const teamDefaults = teamDefaultsJson as TeamDefaults;
 
-  type Tab = 'general' | 'meetings' | 'github' | 'templates' | 'appearance' | 'about';
+  type Tab = 'general' | 'meetings' | 'tempo' | 'github' | 'templates' | 'appearance' | 'about';
   let active = $state<Tab>('general');
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'general', label: 'General' },
     { id: 'meetings', label: 'Meetings' },
+    { id: 'tempo', label: 'Tempo' },
     { id: 'github', label: 'GitHub' },
     { id: 'templates', label: 'Templates' },
     { id: 'appearance', label: 'Appearance' },
@@ -63,6 +71,70 @@
   let userMappings = $state<MappingRow[]>([]);
   let mappingsDirty = $state(false);
   let mappingsSavedFlash = $state(false);
+
+  // Tempo tab
+  let tempoToken = $state('');
+  let tempoTokenStoredLength = $state(0);
+  let tempoTokenEditing = $state(true);
+  let tempoTokenSavedFlash = $state(false);
+  let tempoTestRunning = $state(false);
+  let tempoTestResult = $state<{ ok: boolean; message: string } | null>(null);
+
+  $effect(() => {
+    void getTempoToken().then((token) => {
+      tempoTokenStoredLength = token?.length ?? 0;
+      tempoTokenEditing = !token;
+    });
+  });
+
+  async function saveTempoToken() {
+    const trimmed = tempoToken.trim();
+    if (trimmed.length === 0) return;
+    await setTempoToken(trimmed);
+    tempoTokenStoredLength = trimmed.length;
+    tempoToken = '';
+    tempoTokenEditing = false;
+    tempoTestResult = null;
+    flash((v) => (tempoTokenSavedFlash = v));
+  }
+
+  async function removeTempoToken() {
+    if (!confirm('Remove the stored Tempo API token?')) return;
+    await clearTempoToken();
+    tempoTokenStoredLength = 0;
+    tempoToken = '';
+    tempoTokenEditing = true;
+    tempoTestResult = null;
+  }
+
+  function localToday(): string {
+    const d = new Date();
+    const pad = (v: number) => String(v).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  async function testTempoToken() {
+    tempoTestRunning = true;
+    tempoTestResult = null;
+    try {
+      const me = await getMyself();
+      const today = localToday();
+      const worklogs = await listWorklogs({ accountId: me.accountId, dateFrom: today, dateTo: today });
+      tempoTestResult = {
+        ok: true,
+        message: `Token works — ${worklogs.length} worklog(s) found for today.`,
+      };
+    } catch (e) {
+      const message =
+        e instanceof SessionExpiredError && e.service === 'jira'
+          ? 'Jira session expired — log in to Jira in this browser and test again.'
+          : e instanceof Error
+            ? e.message
+            : String(e);
+      tempoTestResult = { ok: false, message };
+    }
+    tempoTestRunning = false;
+  }
 
   // GitHub tab
   let pat = $state('');
@@ -608,6 +680,95 @@
               </div>
             </div>
           {/if}
+        {:else if active === 'tempo'}
+          <h2 class="{n('text-retro-bright neon-text-cyan', 'text-slate-900')} text-base font-semibold mb-2">Tempo</h2>
+          <p class="{n('text-retro-muted', 'text-slate-500')} text-xs mb-4">
+            <strong>Required.</strong> Tempo runs outside Jira Cloud, so the
+            extension needs your Tempo API token to read and create worklogs.
+            Stored in <code>chrome.storage.local</code> on this device only.
+          </p>
+
+          <div>
+            <label for="tempo-token-input" class="{n('text-retro-bright', 'text-slate-800')} block text-sm font-medium mb-1">
+              Tempo API token
+            </label>
+            {#if tempoTokenStoredLength > 0 && !tempoTokenEditing}
+              <div class="flex items-center gap-3">
+                <div class="flex-1 px-3 py-2 {n('bg-retro-surface2 border-retro-border text-retro-muted', 'bg-slate-50 border-slate-200 text-slate-500')} border rounded-lg font-mono text-sm">
+                  {'•'.repeat(Math.min(tempoTokenStoredLength, 40))}
+                </div>
+                <button
+                  class="{n('border-retro-border2 hover:bg-retro-surface2 text-retro-text', 'border-slate-200 hover:bg-slate-50 text-slate-700')} px-3 py-1.5 border text-sm rounded-lg transition-colors"
+                  disabled={tempoTestRunning}
+                  onclick={testTempoToken}
+                >
+                  {tempoTestRunning ? 'Testing…' : 'Test'}
+                </button>
+                <button
+                  class="{n('border-retro-border2 hover:bg-retro-surface2 text-retro-text', 'border-slate-200 hover:bg-slate-50 text-slate-700')} px-3 py-1.5 border text-sm rounded-lg transition-colors"
+                  onclick={() => {
+                    tempoTokenEditing = true;
+                    tempoToken = '';
+                  }}
+                >
+                  Replace
+                </button>
+                <button
+                  class="{n('border-neon-red text-neon-red hover:bg-neon-red-bg', 'border-red-200 text-red-600 hover:bg-red-50')} px-3 py-1.5 border text-sm rounded-lg transition-colors"
+                  onclick={removeTempoToken}
+                >
+                  Remove
+                </button>
+              </div>
+            {:else}
+              <div class="flex items-center gap-2">
+                <input
+                  id="tempo-token-input"
+                  type="password"
+                  bind:value={tempoToken}
+                  class="flex-1 px-3 py-2 {n('border-retro-border2 bg-retro-surface text-retro-text', 'border-slate-200 text-slate-800')} border rounded-lg font-mono text-sm"
+                />
+                <button
+                  class="{n('bg-neon-pink hover:bg-neon-pink-dark shadow-neon-pink disabled:bg-retro-border2', 'bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400')} px-3 py-1.5 text-white text-sm rounded-lg transition-colors"
+                  disabled={tempoToken.trim().length === 0}
+                  onclick={saveTempoToken}
+                >
+                  Save
+                </button>
+                {#if tempoTokenStoredLength > 0}
+                  <button
+                    class="{n('border-retro-border2 hover:bg-retro-surface2 text-retro-text', 'border-slate-200 hover:bg-slate-50 text-slate-700')} px-3 py-1.5 border text-sm rounded-lg transition-colors"
+                    onclick={() => {
+                      tempoTokenEditing = false;
+                      tempoToken = '';
+                    }}
+                  >
+                    Cancel
+                  </button>
+                {/if}
+              </div>
+            {/if}
+            {#if tempoTokenSavedFlash}
+              <div class="{n('text-neon-green', 'text-green-600')} text-sm mt-1">Saved ✓</div>
+            {/if}
+            {#if tempoTestResult}
+              <div class="{tempoTestResult.ok ? n('text-neon-green', 'text-green-600') : n('text-neon-red', 'text-red-600')} text-sm mt-1 break-words">
+                {tempoTestResult.message}
+              </div>
+            {/if}
+            <p class="{n('text-retro-muted', 'text-slate-500')} text-xs mt-2">
+              Create one in
+              <a
+                href={JIRA_BASE_URL}
+                target="_blank"
+                rel="noopener"
+                class="{n('text-neon-cyan', 'text-blue-600')} hover:underline">Jira</a
+              >: open <strong>Tempo</strong> from the Apps menu, then
+              <strong>Settings</strong> → <strong>API integration</strong> →
+              <strong>New token</strong>. It needs access to view and manage
+              worklogs.
+            </p>
+          </div>
         {:else if active === 'github'}
           <h2 class="{n('text-retro-bright neon-text-cyan', 'text-slate-900')} text-base font-semibold mb-2">GitHub</h2>
           <p class="{n('text-retro-muted', 'text-slate-500')} text-xs mb-4">
@@ -865,8 +1026,9 @@
             <p>
               <strong>Tempo Auto Logger</strong> logs commits, reviews, and
               meetings to Jira Tempo with one click. It talks to Jira and
-              Google Calendar through your existing browser session (no OAuth
-              tokens needed) and uses a GitHub PAT for your activity.
+              Google Calendar through your existing browser session, to Tempo
+              with your Tempo API token, and uses a GitHub PAT for your
+              activity.
             </p>
             <p>
               <strong>Rules:</strong>
