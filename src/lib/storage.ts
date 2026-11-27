@@ -6,6 +6,7 @@ import type {
 
 const KEYS = {
   GITHUB_TOKEN: 'githubToken',
+  TEMPO_TOKEN: 'tempoToken',
   USER_MEETING_MAPPINGS: 'userMeetingMappings',
   ATTENDANCE_FILTER: 'attendanceFilter',
   USER_TEMPLATES: 'userDescriptionTemplates',
@@ -28,6 +29,20 @@ export async function setGithubToken(token: string): Promise<void> {
 
 export async function clearGithubToken(): Promise<void> {
   await chrome.storage.local.remove(KEYS.GITHUB_TOKEN);
+}
+
+export async function getTempoToken(): Promise<string | null> {
+  const result = await chrome.storage.local.get(KEYS.TEMPO_TOKEN);
+  const token = result[KEYS.TEMPO_TOKEN];
+  return typeof token === 'string' && token.length > 0 ? token : null;
+}
+
+export async function setTempoToken(token: string): Promise<void> {
+  await chrome.storage.local.set({ [KEYS.TEMPO_TOKEN]: token });
+}
+
+export async function clearTempoToken(): Promise<void> {
+  await chrome.storage.local.remove(KEYS.TEMPO_TOKEN);
 }
 
 export async function getUserMeetingMappings(): Promise<MeetingMapping[]> {

@@ -8,7 +8,7 @@ Chrome extension that auto-logs time to Jira Tempo from your GitHub activity and
 
 ## How it works (planned)
 
-- **Auth** — piggybacks on your existing browser sessions. Jira/Tempo and Google Calendar are reached via same-origin fetches from your logged-in tabs (no OAuth, no API tokens). GitHub uses a personal access token stored in `chrome.storage.local`.
+- **Auth** — piggybacks on your existing browser sessions. Jira Cloud and Google Calendar are reached with your logged-in browser session (no OAuth). Tempo Cloud needs your own Tempo API token and GitHub a personal access token; both are stored in `chrome.storage.local`.
 - **GitHub** — scans configured orgs (`github-orgs.json`) for commits you authored and reviews you submitted. Extracts Jira keys from PR title → branch name → commit message.
 - **Calendar** — reads events from `calendar.google.com` for the chosen date range. Meeting → Jira mapping is substring-based and learns over time (team defaults in repo + per-user overrides in local storage).
 - **Time rules** — commits: 1 min per Jira issue per day. Reviews: 15 min per PR per day. Meetings: exact calendar duration.

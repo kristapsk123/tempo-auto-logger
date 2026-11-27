@@ -31,7 +31,8 @@ export default defineManifest({
   },
   permissions: ['storage', 'alarms', 'nativeMessaging'],
   host_permissions: [
-    'https://jira.visma.com/*',
+    'https://vismahorizon.atlassian.net/*',
+    'https://api.tempo.io/*',
     'https://calendar.google.com/*',
     'https://api.github.com/*',
   ],

@@ -389,7 +389,10 @@
     } catch (e) {
       if (e instanceof SessionExpiredError) {
         loadErrorService = e.service;
-        loadError = `${e.service} session expired \u2014 log in and retry`;
+        loadError =
+          e.service === 'tempo'
+            ? 'Tempo API token is missing or invalid \u2014 add it in Settings and retry'
+            : `${e.service} session expired \u2014 log in and retry`;
       } else {
         loadError = e instanceof Error ? e.message : String(e);
       }
@@ -523,7 +526,7 @@
         minutes: r.entry.minutes,
         comment: r.entry.comment,
       })),
-      preview.jiraWorker,
+      preview.jiraAccountId,
       (result) => {
         const row = rows.find((x) => x.entry.id === result.id);
         if (!row) return;
@@ -556,7 +559,7 @@
 
   function loggedMinutesOn(date: string): number {
     return (preview?.existingWorklogs ?? [])
-      .filter((w) => typeof w.started === 'string' && w.started.slice(0, 10) === date)
+      .filter((w) => w.startDate === date)
       .reduce((sum, w) => sum + Math.round((w.timeSpentSeconds || 0) / SECONDS_PER_MINUTE), 0);
   }
 
@@ -855,6 +858,13 @@
           onclick={openJira}
         >
           Open Jira to log in
+        </button>
+      {:else if loadErrorService === 'tempo'}
+        <button
+          class="mt-1 px-2.5 py-1 border {n('border-neon-red-dark hover:bg-neon-red-bg text-neon-red', 'border-red-200 hover:bg-red-100 text-red-700')} rounded-lg text-xs transition-colors"
+          onclick={() => chrome.runtime.openOptionsPage()}
+        >
+          Open Settings
         </button>
       {:else if loadErrorService === 'calendar'}
         <button

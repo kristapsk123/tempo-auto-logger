@@ -96,12 +96,6 @@
             f.summary.toLowerCase().includes(q),
         )
       : favorites.slice();
-    // Stable sort: Tempo favorites first, rest keep incoming order.
-    matching.sort((a, b) => {
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-      return 0;
-    });
     return matching.slice(0, 20);
   });
 
@@ -138,18 +132,13 @@
       {#each filtered as fav (fav.key)}
         <button
           type="button"
-          title={fav.isFavorite
-            ? `⭐ Favorite — ${fav.summary || fav.key}`
-            : fav.summary || fav.key}
+          title={fav.summary || fav.key}
           class="w-full text-left px-2 py-1.5 {theme.neon ? 'hover:bg-retro-surface2 border-b border-retro-border' : 'hover:bg-slate-50 border-b border-slate-100'} flex gap-1.5 items-baseline text-[11px] last:border-0 transition-colors"
           onmousedown={(e) => {
             e.preventDefault();
             pick(fav.key);
           }}
         >
-          <span class="shrink-0 w-3 text-center">
-            {#if fav.isFavorite}⭐{/if}
-          </span>
           <span class="{theme.neon ? 'text-neon-cyan' : 'text-blue-600'} font-mono shrink-0 w-20">{fav.key}</span>
           <span class="{theme.neon ? 'text-retro-text' : 'text-slate-600'} truncate flex-1 font-sans">
             {fav.summary || '(no summary)'}
