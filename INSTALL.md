@@ -15,7 +15,7 @@ extension. You don't need to know git, npm, or anything technical.
 - Local admin rights on your machine (the script auto-elevates via
   UAC — you click *Yes* once)
 - About 2–3 minutes
-- You already log in to Jira (`vismahorizon.atlassian.net`) and Google
+- You already log in to your company's Jira Cloud site and Google
   Calendar in this browser
 - A Tempo API token — in Jira open **Tempo** from the Apps menu, then
   **Settings** → **API integration** → **New token**. Paste it on the
@@ -101,7 +101,7 @@ delete.
 ## Step 5 — Try it out
 
 1. Make sure you're logged in to both
-   [Jira](https://vismahorizon.atlassian.net) and
+   Jira and
    [Google Calendar](https://calendar.google.com) in this browser.
 2. Click the extension icon → popup opens.
 3. Click **Yesterday** (or another preset).
@@ -179,7 +179,7 @@ entry listed. If not, the installer didn't run as admin — repeat
 Step 1.
 
 **"Jira session expired" error**
-→ Open `vismahorizon.atlassian.net` in a tab and log in again. Retry.
+→ Open Jira in a tab and log in again. Retry.
 
 **"Tempo API token is missing or invalid" error**
 → Open the extension's Settings, **Tempo** tab, and save a token

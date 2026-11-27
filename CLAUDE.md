@@ -34,8 +34,8 @@ with `credentials: 'include'`, so no OAuth app or Jira token is needed.
 Tempo is the exception — on Jira Cloud it is a separate service that does
 not accept the Jira session.
 
-- **Jira:** `jiraFetch('/rest/api/3/...')` against
-  `vismahorizon.atlassian.net` with `credentials: 'include'`.
+- **Jira:** `jiraFetch('/rest/api/3/...')` against the
+  Jira Cloud site in `JIRA_BASE_URL` with `credentials: 'include'`.
 - **Tempo:** `tempoFetch(...)` against `https://api.tempo.io/4` with
   `Authorization: Bearer <token>`. The token is the user's own Tempo API
   token (Tempo → Settings → API integration), saved on the Options
@@ -59,7 +59,7 @@ not accept the Jira session.
 
 ## Environment-specific facts
 
-Jira: `https://vismahorizon.atlassian.net` — **Jira Cloud** with the
+Jira: the site in `JIRA_BASE_URL` (`src/lib/config.ts`) — **Jira Cloud** with the
 **Tempo Cloud** app. Jira calls use `/rest/api/3/...`; the user is
 identified by `accountId` from `/rest/api/3/myself`. Issue search is
 `/rest/api/3/search/jql`, paged with `nextPageToken`. Project key:
